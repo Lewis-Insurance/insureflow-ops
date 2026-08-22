@@ -20,7 +20,7 @@ import { AddNoteModal } from './AddNoteModal';
 import { AddTaskModal } from './AddTaskModal';
 import { UploadDocModal } from './UploadDocModal';
 import { EditPolicyModal } from './EditPolicyModal';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QuoteVsIncumbentComparison } from '@/components/quotes/QuoteVsIncumbentComparison';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,6 +48,8 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialPoliciesTab = searchParams.get('policiesTab') === 'quotes' ? 'quotes' : 'policies';
+  const shouldAutoExpandCompare = searchParams.get('expandCompare') === '1';
+  const hasAutoExpandedCompare = useRef(false);
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
@@ -60,10 +62,11 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
   const { toast } = useToast();
 
   useEffect(() => {
-    if (quotes.length > 0 && initialPoliciesTab === 'quotes') {
-      setExpandedCompareQuoteId(quotes[0].id);
-    }
-  }, [quotes, initialPoliciesTab]);
+    if (hasAutoExpandedCompare.current) return;
+    if (!shouldAutoExpandCompare || initialPoliciesTab !== 'quotes' || quotes.length === 0) return;
+    setExpandedCompareQuoteId(quotes[0].id);
+    hasAutoExpandedCompare.current = true;
+  }, [quotes, initialPoliciesTab, shouldAutoExpandCompare]);
 
   // Filter policies for this specific customer
   const policies = allPolicies.filter(policy => policy.account_id === accountId);

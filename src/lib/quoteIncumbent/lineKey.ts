@@ -13,9 +13,12 @@ const LOB_TO_LINE: Record<string, CoverageLineKey> = {
   home: 'property',
 };
 
-export function lineKeyFromLineOfBusiness(lineOfBusiness: string | null | undefined): CoverageLineKey {
+export function lineKeyFromLineOfBusiness(
+  lineOfBusiness: string | null | undefined,
+): CoverageLineKey | null {
   const key = (lineOfBusiness ?? '').toLowerCase();
-  return LOB_TO_LINE[key] ?? 'gl';
+  if (!key) return null;
+  return LOB_TO_LINE[key] ?? null;
 }
 
 export function lobMatchesPolicyAndQuote(
@@ -24,6 +27,7 @@ export function lobMatchesPolicyAndQuote(
 ): boolean {
   const policyKey = lineKeyFromLineOfBusiness(policyLineOfBusiness);
   const quoteKey = lineKeyFromLineOfBusiness(quoteLineOfBusiness);
+  if (policyKey === null || quoteKey === null) return false;
   return policyKey === quoteKey;
 }
 

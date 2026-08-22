@@ -127,6 +127,45 @@ describe('quoteIncumbent proposeIncumbentPolicies', () => {
     });
     expect(ranked).toHaveLength(0);
   });
+
+  it('does not boost quote carrier when ranking incumbent candidates', () => {
+    const trueIncumbent: PolicyRow = {
+      ...incumbentPolicyFixture,
+      id: 'policy-true-incumbent',
+      carrier: 'Hartford',
+      effective_date: '2025-06-01',
+    };
+    const sameCarrierPolicy: PolicyRow = {
+      ...incumbentPolicyFixture,
+      id: 'policy-same-carrier',
+      carrier: 'Travelers',
+      effective_date: '2024-01-01',
+    };
+
+    const ranked = proposeIncumbentPolicies({
+      policies: [sameCarrierPolicy, trueIncumbent],
+      quoteLineOfBusiness: 'gl',
+      carrierHint: 'Travelers',
+    });
+
+    expect(ranked[0]?.policy.id).toBe('policy-true-incumbent');
+    expect(ranked.find((c) => c.policy.id === 'policy-same-carrier')?.reasons).not.toContain(
+      'Carrier aligns with extracted carrier',
+    );
+  });
+
+  it('excludes policies with unmapped line of business', () => {
+    const cyberPolicy: PolicyRow = {
+      ...incumbentPolicyFixture,
+      id: 'policy-cyber',
+      line_of_business: 'cyber',
+    };
+    const ranked = proposeIncumbentPolicies({
+      policies: [cyberPolicy],
+      quoteLineOfBusiness: 'cyber',
+    });
+    expect(ranked).toHaveLength(0);
+  });
 });
 
 describe('quoteIncumbent diff engine', () => {
@@ -169,6 +208,10 @@ describe('quoteIncumbent diff engine', () => {
     const claimsMade = materialDifferences.find((d) => d.fieldPath === 'ClaimsMade');
     expect(claimsMade).toBeDefined();
     expect(claimsMade?.changeType).toBe('modified');
+
+    const premiumDrop = materialDifferences.find((d) => d.fieldPath === 'TotalPremium');
+    expect(premiumDrop).toBeDefined();
+    expect(premiumDrop?.changeType).toBe('decreased');
   });
 
   it('is deterministic across repeated runs', () => {

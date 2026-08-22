@@ -224,7 +224,7 @@ export function useExtractWritebackProposals({
         description: 'The extracted quote was added to the account.',
       });
       if (accountId) {
-        navigate(`/customers/${accountId}?tab=policies&policiesTab=quotes`);
+        navigate(`/customers/${accountId}?tab=policies&policiesTab=quotes&expandCompare=1`);
       }
     },
     onError: (err: Error) => {

@@ -33,9 +33,8 @@ function isOpenPolicy(policy: PolicyRow): boolean {
  * Never auto-applies policy changes; producer must confirm selection in UI.
  */
 export function proposeIncumbentPolicies(input: ProposeIncumbentInput): IncumbentPolicyCandidate[] {
-  const { policies, quoteLineOfBusiness, policyNumberHint, carrierHint } = input;
+  const { policies, quoteLineOfBusiness, policyNumberHint } = input;
   const hintNumber = normalizePolicyNumber(policyNumberHint);
-  const hintCarrier = (carrierHint ?? '').trim().toLowerCase();
 
   const candidates: IncumbentPolicyCandidate[] = [];
 
@@ -59,12 +58,6 @@ export function proposeIncumbentPolicies(input: ProposeIncumbentInput): Incumben
     } else if (hintNumber && policyNumber && policyNumber.includes(hintNumber)) {
       score += 200;
       reasons.push('Policy number partially matches the extract snapshot');
-    }
-
-    const policyCarrier = (policy.carrier ?? '').trim().toLowerCase();
-    if (hintCarrier && policyCarrier && policyCarrier.includes(hintCarrier)) {
-      score += 50;
-      reasons.push('Carrier aligns with extracted carrier');
     }
 
     if (policy.effective_date) {

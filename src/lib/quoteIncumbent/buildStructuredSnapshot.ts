@@ -65,7 +65,7 @@ function addField(
 function emptySnapshotShell(
   id: string,
   docRole: 'A' | 'B',
-  lineKey: CoverageLineKey,
+  lineKey: CoverageLineKey | null,
   carrier: string | null,
 ): PolicySnapshot {
   const namedInsured = makeSnapshotField('NamedInsured', null, 'text', 'identifiers');
@@ -79,7 +79,7 @@ function emptySnapshotShell(
     workspaceDocumentId: id,
     docRole,
     documentType: docRole === 'A' ? 'policy' : 'quote',
-    lineOfBusiness: mapLineKeyToComparisonLob(lineKey),
+    lineOfBusiness: lineKey ? mapLineKeyToComparisonLob(lineKey) : 'UNKNOWN',
     carrier,
     carrierNAIC: null,
     namedInsured,
@@ -305,7 +305,9 @@ export function buildPolicyStructuredSnapshot(policy: PolicyRow, carrierName?: s
   snapshot.expirationDate = expirationDate;
   snapshot.premiums.TotalPremium = totalPremium;
 
-  addPolicyLineFields(snapshot, policy, lineKey);
+  if (lineKey) {
+    addPolicyLineFields(snapshot, policy, lineKey);
+  }
 
   snapshot.totalFields = Object.keys(snapshot.fields).length;
   snapshot.autoAppliedCount = snapshot.totalFields;
@@ -419,7 +421,7 @@ export function buildQuoteStructuredSnapshot(source: QuoteSnapshotSource): Polic
     'dates',
   );
   const quotedPremium = makeSnapshotField(
-    'QuotedPremium',
+    'TotalPremium',
     source.premium != null ? String(source.premium) : null,
     'currency',
     'premium',
@@ -433,7 +435,7 @@ export function buildQuoteStructuredSnapshot(source: QuoteSnapshotSource): Polic
   snapshot.policyNumber = policyNumber;
   snapshot.effectiveDate = effectiveDate;
   snapshot.expirationDate = expirationDate;
-  snapshot.premiums.QuotedPremium = quotedPremium;
+  snapshot.premiums.TotalPremium = quotedPremium;
 
   const claimsMade = source.claims_made ?? options.claims_made;
   const defenseInside = source.defense_inside_limits ?? options.defense_inside_limits;

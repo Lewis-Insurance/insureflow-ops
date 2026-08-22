@@ -22,6 +22,8 @@ export interface ProposedQuoteOptions {
   fees: ProposedQuoteFee[];
   commission_pct: number | null;
   commission_amount: number | null;
+  claims_made: boolean | null;
+  defense_inside_limits: boolean | null;
 }
 
 export interface ProposedQuoteCoverage {
@@ -241,6 +243,8 @@ function buildPayloadForCarrier(
         fees: mapFees(snapshot),
         commission_pct: snapshot.commission?.percent ?? null,
         commission_amount: snapshot.commission?.amount ?? null,
+        claims_made: snapshot.claims_made,
+        defense_inside_limits: snapshot.defense_inside_limits,
       },
     },
     quote_coverages: mapCoverages(snapshot),

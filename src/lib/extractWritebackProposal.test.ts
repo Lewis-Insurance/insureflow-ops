@@ -164,6 +164,8 @@ describe('extractWritebackProposal', () => {
       expect(hartford.quote.options.premium_frequency).toBe('annual');
       expect(hartford.quote.options.commission_pct).toBe(12.5);
       expect(hartford.quote.options.commission_amount).toBe(5781.25);
+      expect(hartford.quote.options.claims_made).toBe(true);
+      expect(hartford.quote.options.defense_inside_limits).toBe(false);
       expect(hartford.quote.options.fees).toHaveLength(2);
       expect(hartford.quote.options.fees[0].type).toBe('surplus_lines');
       expect(hartford.quote_coverages).toHaveLength(2);
