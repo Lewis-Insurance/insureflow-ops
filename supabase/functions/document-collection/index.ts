@@ -350,7 +350,7 @@ async function createPacket(
   let portalUrl: string | null = null;
   let token: string | null = null;
 
-  const { data: tokenResult } = await supabase.rpc('generate_collection_token', {
+  const { data: tokenResult, error: tokenError } = await supabase.rpc('generate_collection_token', {
     p_workspace_id: workspace.id,
     p_account_id: account_id,
     p_recipient_email: recipient_email,
@@ -359,11 +359,13 @@ async function createPacket(
     p_created_by: userId,
   });
 
-  if (tokenResult) {
-    token = tokenResult;
-    const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://lewisinsurance.ai';
-    portalUrl = `${baseUrl}/portal/collect/${token}`;
+  if (tokenError || !tokenResult) {
+    throw new Error(`Failed to generate portal token: ${tokenError?.message ?? 'missing token'}`);
   }
+
+  token = tokenResult;
+  const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://lewisinsurance.ai';
+  portalUrl = `${baseUrl}/portal/collect/${token}`;
 
   // Log creation
   await supabase.from('collection_audit_log').insert({
