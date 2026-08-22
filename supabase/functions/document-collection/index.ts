@@ -14,6 +14,46 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 import { runPhase0DocumentExtract } from '../_shared/phase0Extract.ts';
 
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
+
+/**
+ * Keep background work alive after the HTTP response on Supabase Edge.
+ * Falls back to await when EdgeRuntime.waitUntil is unavailable (local dev).
+ */
+async function scheduleBackgroundWork(work: Promise<unknown>): Promise<void> {
+  const bounded = work.catch((err) => {
+    console.error('[document-collection] Background work failed:', err);
+  });
+
+  if (typeof EdgeRuntime !== 'undefined' && typeof EdgeRuntime.waitUntil === 'function') {
+    EdgeRuntime.waitUntil(bounded);
+    return;
+  }
+
+  await bounded;
+}
+
+async function assertStaffAccess(
+  req: Request,
+  supabaseUrl: string,
+  corsHeaders: Record<string, string>,
+): Promise<Response | null> {
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const caller = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+  });
+
+  const { data: isStaff, error: staffErr } = await caller.rpc('is_staff');
+  if (staffErr || isStaff !== true) {
+    return new Response(
+      JSON.stringify({ error: 'Staff access required' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  return null;
+}
+
 interface CreatePacketRequest {
   action: 'create_packet';
   account_id: string;
@@ -200,6 +240,10 @@ serve(async (req) => {
             JSON.stringify({ error: 'Authentication required' }),
             { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
+        }
+        {
+          const staffDenied = await assertStaffAccess(req, supabaseUrl, corsHeaders);
+          if (staffDenied) return staffDenied;
         }
         result = await processCollectionUpload(supabase, body as ProcessCollectionUploadRequest, userId);
         break;
@@ -652,16 +696,16 @@ async function portalUpload(
     throw new Error(`Failed to record upload: ${uploadRecordError.message}`);
   }
 
-  // Trigger Phase 0 extract (fire-and-forget; errors logged in background)
-  triggerCollectionExtract(supabase, {
-    documentId: document.id,
-    uploadId: upload.id,
-    accountId: requirement.workspaces.account_id,
-    filename,
-    createdBy: null,
-  }).catch((err) => {
-    console.error('[document-collection] Background extract failed:', err);
-  });
+  // Phase 0 extract runs after response via EdgeRuntime.waitUntil (or await fallback).
+  await scheduleBackgroundWork(
+    triggerCollectionExtract(supabase, {
+      documentId: document.id,
+      uploadId: upload.id,
+      accountId: requirement.workspaces.account_id,
+      filename,
+      createdBy: null,
+    }),
+  );
 
   // Log upload
   await supabase.from('collection_audit_log').insert({

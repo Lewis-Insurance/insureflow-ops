@@ -79,6 +79,24 @@ describe('collection portal extract pipeline', () => {
     expect(documentCollectionSource).toMatch(/analysis_id: result\.analysisId/);
   });
 
+  it('requires is_staff for process_collection_upload', () => {
+    expect(documentCollectionSource).toMatch(/assertStaffAccess/);
+    expect(documentCollectionSource).toMatch(/caller\.rpc\('is_staff'\)/);
+    expect(documentCollectionSource).toMatch(/Staff access required/);
+    expect(documentCollectionSource).toMatch(/status:\s*403/);
+  });
+
+  it('schedules portal extract via waitUntil or await, not a dangling promise', () => {
+    expect(documentCollectionSource).toMatch(/scheduleBackgroundWork/);
+    expect(documentCollectionSource).toMatch(/EdgeRuntime\.waitUntil/);
+    expect(documentCollectionSource).toMatch(
+      /await scheduleBackgroundWork\(\s*triggerCollectionExtract/,
+    );
+    expect(documentCollectionSource).not.toMatch(
+      /triggerCollectionExtract\([\s\S]*?\)\.catch\(/,
+    );
+  });
+
   it('denormalizes snapshot columns in phase0Extract shared module', () => {
     expect(phase0ExtractSource).toMatch(/denormalizeExtractSnapshotColumns/);
     expect(phase0ExtractSource).toMatch(/policy_number: denormalized\.policy_number/);
