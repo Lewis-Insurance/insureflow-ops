@@ -104,4 +104,24 @@ describe('collection portal extract pipeline', () => {
     expect(phase0ExtractSource).toMatch(/expiration_date: denormalized\.expiration_date/);
     expect(phase0ExtractSource).toMatch(/insured_name: denormalized\.insured_name/);
   });
+
+  it('always mints a portal token on create_packet without recipient gate', () => {
+    const createPacketFn = documentCollectionSource.match(
+      /async function createPacket\([\s\S]*?\n\}/,
+    )?.[0];
+    expect(createPacketFn).toBeTruthy();
+    expect(createPacketFn).toMatch(/generate_collection_token/);
+    expect(createPacketFn).not.toMatch(/if\s*\(\s*recipient_email\s*\|\|\s*recipient_name\s*\)/);
+    expect(createPacketFn).toMatch(/PUBLIC_SITE_URL.*lewisinsurance\.ai/s);
+  });
+
+  it('sendReminder returns logged semantics, not sent', () => {
+    const sendReminderFn = documentCollectionSource.match(
+      /async function sendReminder\([\s\S]*?\n\}/,
+    )?.[0];
+    expect(sendReminderFn).toBeTruthy();
+    expect(sendReminderFn).toMatch(/logged:\s*true/);
+    expect(sendReminderFn).toMatch(/logged:\s*false/);
+    expect(sendReminderFn).not.toMatch(/sent:\s*true/);
+  });
 });

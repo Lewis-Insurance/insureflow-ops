@@ -346,26 +346,23 @@ async function createPacket(
     }
   }
 
-  // Generate portal token if recipient provided
+  // Always mint a portal token on create
   let portalUrl: string | null = null;
   let token: string | null = null;
-  
-  if (recipient_email || recipient_name) {
-    const { data: tokenResult } = await supabase.rpc('generate_collection_token', {
-      p_workspace_id: workspace.id,
-      p_account_id: account_id,
-      p_recipient_email: recipient_email,
-      p_recipient_name: recipient_name,
-      p_expires_days: expires_days,
-      p_created_by: userId,
-    });
 
-    if (tokenResult) {
-      token = tokenResult;
-      // Build portal URL (adjust base URL as needed)
-      const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://lewisinsurance.ai';
-      portalUrl = `${baseUrl}/portal/collect/${token}`;
-    }
+  const { data: tokenResult } = await supabase.rpc('generate_collection_token', {
+    p_workspace_id: workspace.id,
+    p_account_id: account_id,
+    p_recipient_email: recipient_email,
+    p_recipient_name: recipient_name,
+    p_expires_days: expires_days,
+    p_created_by: userId,
+  });
+
+  if (tokenResult) {
+    token = tokenResult;
+    const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://lewisinsurance.ai';
+    portalUrl = `${baseUrl}/portal/collect/${token}`;
   }
 
   // Log creation
@@ -973,7 +970,7 @@ async function sendReminder(
     .gt('expires_at', new Date().toISOString());
 
   if (!tokens || tokens.length === 0) {
-    return { sent: false, message: 'No active tokens found' };
+    return { logged: false, message: 'No active tokens found' };
   }
 
   // Get incomplete requirements
@@ -997,7 +994,7 @@ async function sendReminder(
   });
 
   return { 
-    sent: true, 
+    logged: true, 
     recipients: tokens.length,
     pending_requirements: requirements?.length || 0,
   };

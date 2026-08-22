@@ -87,6 +87,8 @@ interface CreatePacketModalProps {
   onOpenChange: (open: boolean) => void;
   accountId: string;
   policyId?: string;
+  accountEmail?: string | null;
+  accountName?: string;
 }
 
 export function CreatePacketModal({ 
@@ -94,6 +96,8 @@ export function CreatePacketModal({
   onOpenChange, 
   accountId,
   policyId,
+  accountEmail,
+  accountName,
 }: CreatePacketModalProps) {
   const { toast } = useToast();
   const { data: templates = [] } = useCollectionTemplates();
@@ -102,8 +106,8 @@ export function CreatePacketModal({
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState('');
-  const [recipientName, setRecipientName] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState(accountEmail || '');
+  const [recipientName, setRecipientName] = useState(accountName || '');
   const [expiresDays, setExpiresDays] = useState(30);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
@@ -116,8 +120,8 @@ export function CreatePacketModal({
   const resetForm = () => {
     setName('');
     setDescription('');
-    setRecipientEmail('');
-    setRecipientName('');
+    setRecipientEmail(accountEmail || '');
+    setRecipientName(accountName || '');
     setExpiresDays(30);
     setSelectedTemplateId(null);
     setRequirements([]);
@@ -202,10 +206,19 @@ export function CreatePacketModal({
     });
 
     if (result.portal_url) {
+      try {
+        await navigator.clipboard.writeText(result.portal_url);
+        setCopied(true);
+      } catch {
+        setCopied(false);
+      }
       setPortalUrl(result.portal_url);
     } else {
-      onOpenChange(false);
-      resetForm();
+      toast({
+        title: 'Portal link missing',
+        description: 'The packet was created but no portal link was returned. Try generating a link from the packet list.',
+        variant: 'destructive',
+      });
     }
   };
 
