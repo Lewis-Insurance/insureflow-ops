@@ -32,8 +32,10 @@ import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
 import { AORenewalDocuments } from '@/components/renewals/AORenewalDocuments';
+import { AoRenewalExtractSignalLink } from '@/components/renewals/AoRenewalExtractSignalLink';
 import { AORenewalEditorContext, type AORenewalDirtyRegistration } from '@/components/renewals/aoRenewalEditor';
 import { useNavigationGuard } from '@/contexts/NavigationGuardContext';
+import { useAoRenewalThisTermExtractSignals } from '@/hooks/useAoRenewalThisTermExtractSignals';
 import {
   addDaysLocalDate,
   differenceFromTodayInLocalDays,
@@ -96,6 +98,8 @@ export default function AORenewalEdit() {
   const { toast } = useToast();
 
   const { data: renewal, isLoading } = useAORenewal(id);
+  const { data: extractSignals } = useAoRenewalThisTermExtractSignals(renewal ? [renewal] : []);
+  const extractSignal = renewal ? extractSignals?.get(renewal.id) : undefined;
   const updateMutation = useUpdateAORenewal();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const followUpMutation = useSetAORenewalFollowUp();
@@ -633,6 +637,7 @@ export default function AORenewalEdit() {
                       {formData.policy_type || 'Policy type not set'}
                     </Badge>
                   </div>
+                  <AoRenewalExtractSignalLink signal={extractSignal} />
                 </div>
 
                 <div className="flex w-full flex-col gap-3 xl:max-w-sm">

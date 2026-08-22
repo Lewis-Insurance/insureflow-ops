@@ -82,6 +82,8 @@ import {
 } from "@/hooks/useAORenewals";
 import { supabase } from "@/integrations/supabase/client";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
+import { AoRenewalExtractSignalLink } from "@/components/renewals/AoRenewalExtractSignalLink";
+import { useAoRenewalThisTermExtractSignals } from "@/hooks/useAoRenewalThisTermExtractSignals";
 
 type SortField = "renewal_date" | "current_premium" | "days_since_contact" | "follow_up_date";
 type ActiveTile = "follow_up_today" | "overdue_follow_up" | "renewing_7" | "no_contact_7";
@@ -281,6 +283,12 @@ export default function AORenewalsPage() {
         return cmp * dir;
       });
   }, [openRenewals, activeTile, sortField, sortDirection]);
+
+  const visibleRenewalRows = useMemo(
+    () => visibleRenewals.map(({ renewal }) => renewal),
+    [visibleRenewals],
+  );
+  const { data: extractSignals } = useAoRenewalThisTermExtractSignals(visibleRenewalRows);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -538,6 +546,7 @@ export default function AORenewalsPage() {
                         <TableCell>
                           <div className="font-medium">{renewal.customer_name}</div>
                           <div className="text-xs text-muted-foreground font-mono">{renewal.policy_number}</div>
+                          <AoRenewalExtractSignalLink signal={extractSignals?.get(renewal.id)} />
                         </TableCell>
                         <TableCell>
                           <div>{formatRenewalDate(renewal.renewal_date)}</div>
