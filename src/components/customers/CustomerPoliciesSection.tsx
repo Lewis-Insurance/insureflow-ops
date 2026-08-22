@@ -20,7 +20,8 @@ import { AddNoteModal } from './AddNoteModal';
 import { AddTaskModal } from './AddTaskModal';
 import { UploadDocModal } from './UploadDocModal';
 import { EditPolicyModal } from './EditPolicyModal';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { QuoteVsIncumbentComparison } from '@/components/quotes/QuoteVsIncumbentComparison';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -55,7 +56,14 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
   const [selectedPolicy, setSelectedPolicy] = useState<PolicyWithAccount | null>(null);
+  const [expandedCompareQuoteId, setExpandedCompareQuoteId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (quotes.length > 0 && initialPoliciesTab === 'quotes') {
+      setExpandedCompareQuoteId(quotes[0].id);
+    }
+  }, [quotes, initialPoliciesTab]);
 
   // Filter policies for this specific customer
   const policies = allPolicies.filter(policy => policy.account_id === accountId);
@@ -509,7 +517,30 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
                         <Shield className="h-4 w-4 mr-1" />
                         Bind policy
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                        onClick={() =>
+                          setExpandedCompareQuoteId((current) =>
+                            current === quote.id ? null : quote.id,
+                          )
+                        }
+                      >
+                        Compare to incumbent
+                      </Button>
                     </div>
+
+                    {expandedCompareQuoteId === quote.id ? (
+                      <div className="mt-4 border-t border-cc-border-subtle pt-4">
+                        <QuoteVsIncumbentComparison
+                          accountId={accountId}
+                          quoteId={quote.id}
+                          quoteLineOfBusiness={quote.line_of_business}
+                          carrierHint={quote.carrier_info?.name ?? quote.competitor_carrier}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
