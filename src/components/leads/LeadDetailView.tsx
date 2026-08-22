@@ -38,6 +38,8 @@ import { useLead, useUpdateLead, useDeleteLead } from "@/hooks/useLeads";
 import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
 import { InsuranceDetailsPanel } from "./insurance/InsuranceDetailsPanel";
 import { AddQuoteModal } from "@/components/customers/AddQuoteModal";
+import { useEnsureLeadProspectAccount } from "@/hooks/useEnsureLeadProspectAccount";
+import { toast } from "sonner";
 import { useRankedQuotesByAccount } from "@/hooks/useQuoteScoring";
 import {
   Phone,
@@ -109,11 +111,13 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
+  const [addQuoteAccountId, setAddQuoteAccountId] = useState<string | null>(null);
   const { data: lead, isLoading } = useLead(leadId || undefined);
   const { data: sources } = useLeadSources();
-  const { data: rankedQuotes } = useRankedQuotesByAccount(leadId || '');
+  const { data: rankedQuotes } = useRankedQuotesByAccount(lead?.account_id ?? lead?.converted_account_id ?? '');
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
+  const ensureProspectAccount = useEnsureLeadProspectAccount();
 
   // Query for Canopy pull summary linked to this lead
   const { data: canopyPull } = useQuery({
@@ -176,6 +180,25 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
         onOpenChange(false);
       },
     });
+  };
+
+  const handleAddQuote = async () => {
+    if (!leadId || !lead) return;
+
+    const existingAccountId = lead.account_id ?? lead.converted_account_id ?? null;
+    if (existingAccountId) {
+      setAddQuoteAccountId(existingAccountId);
+      setAddQuoteOpen(true);
+      return;
+    }
+
+    try {
+      const accountId = await ensureProspectAccount.mutateAsync(leadId);
+      setAddQuoteAccountId(accountId);
+      setAddQuoteOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to prepare prospect account.');
+    }
   };
 
   if (isLoading || !lead) {
@@ -461,7 +484,8 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setAddQuoteOpen(true)}
+                    onClick={handleAddQuote}
+                    disabled={ensureProspectAccount.isPending}
                   >
                     <Plus className="h-3 w-3 mr-1" />
                     Add Quote
@@ -539,7 +563,8 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setAddQuoteOpen(true)}
+                      onClick={handleAddQuote}
+                    disabled={ensureProspectAccount.isPending}
                     >
                       <Plus className="h-3 w-3 mr-1" />
                       Add First Quote
@@ -801,11 +826,11 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
       </Sheet>
 
       {/* Add Quote Modal */}
-      {lead && (
+      {lead && addQuoteAccountId && (
         <AddQuoteModal
           open={addQuoteOpen}
           onOpenChange={setAddQuoteOpen}
-          accountId={lead.id}
+          accountId={addQuoteAccountId}
           accountName={`${lead.first_name} ${lead.last_name}`}
         />
       )}

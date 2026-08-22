@@ -32,6 +32,7 @@ import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
 import { AORenewalDocuments } from '@/components/renewals/AORenewalDocuments';
+import { DocumentCollectionLinkCard } from '@/components/documents/DocumentCollectionLinkCard';
 import { AoRenewalExtractSignalLink } from '@/components/renewals/AoRenewalExtractSignalLink';
 import { AORenewalEditorContext, type AORenewalDirtyRegistration } from '@/components/renewals/aoRenewalEditor';
 import { useNavigationGuard } from '@/contexts/NavigationGuardContext';
@@ -995,7 +996,17 @@ export default function AORenewalEdit() {
                         <TabsContent value="contact" className="mt-6">
                           <AORenewalContactLog renewalId={renewal.id} renewal={renewal} />
                         </TabsContent>
-                        <TabsContent value="documents" className="mt-6">
+                        <TabsContent value="documents" className="mt-6 space-y-4">
+                          {renewal.account_id ? (
+                            <DocumentCollectionLinkCard
+                              accountId={renewal.account_id}
+                              accountName={renewal.customer_name}
+                            />
+                          ) : (
+                            <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface-raised p-5 text-sm text-cc-text-muted">
+                              Link customer first to send a document collection link.
+                            </div>
+                          )}
                           <AORenewalDocuments
                             renewalId={renewal.id}
                             customerName={renewal.customer_name}

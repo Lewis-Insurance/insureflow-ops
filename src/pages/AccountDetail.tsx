@@ -12,6 +12,7 @@ import { QuoteRankingDashboard } from '@/components/quotes/QuoteRankingDashboard
 import { ClientIntelligencePanel } from '@/components/client/ClientIntelligencePanel';
 import { DocumentsList } from '@/components/documents/DocumentsList';
 import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
+import { DocumentCollectionLinkCard } from '@/components/documents/DocumentCollectionLinkCard';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
 import { Brain, FileText, Inbox } from 'lucide-react';
 import { FloorIdCardRequestButton } from '@/components/floor/FloorIdCardRequestButton';
@@ -154,7 +155,12 @@ export default function AccountDetail() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="collection">
+          <TabsContent value="collection" className="space-y-4">
+            <DocumentCollectionLinkCard
+              accountId={accountId}
+              accountEmail={account.email}
+              accountName={account.name}
+            />
             <DocumentCollectionBoard accountId={accountId} />
           </TabsContent>
 
