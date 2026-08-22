@@ -2,6 +2,7 @@ import { CheckCircle, Loader2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Chip, Skeleton, StatusPill } from '@/components/cc';
+import { QuoteVsIncumbentComparison } from '@/components/quotes/QuoteVsIncumbentComparison';
 import { useExtractWritebackProposals } from '@/hooks/useExtractWritebackProposals';
 import {
   proposalCoverageCount,
@@ -52,8 +53,10 @@ export function ExtractWritebackProposalsPanel({
 }: ExtractWritebackProposalsPanelProps) {
   const {
     proposals,
+    appliedProposals,
     proposalsLoading,
     proposalsFetching,
+    appliedProposalsLoading,
     proposalsError,
     ensuring,
     rejecting,
@@ -74,11 +77,15 @@ export function ExtractWritebackProposalsPanel({
     !proposalsLoading &&
     !proposalsFetching &&
     !ensuring &&
+    !appliedProposalsLoading &&
     proposals.length === 0 &&
+    appliedProposals.length === 0 &&
     !proposalsError
   ) {
     return null;
   }
+
+  const appliedWithQuote = (appliedProposals ?? []).filter((p) => p.quote_id);
 
   return (
     <Card className="border-cc-border bg-cc-surface" data-testid="writeback-proposals-panel">
@@ -176,6 +183,37 @@ export function ExtractWritebackProposalsPanel({
           );
         })}
       </CardContent>
+
+      {appliedWithQuote.length > 0 ? (
+        <CardContent className="space-y-4 border-t border-cc-border pt-4">
+          <div>
+            <p className="text-sm font-medium text-cc-text">Booked quote comparison</p>
+            <p className="text-sm text-cc-text-muted">
+              Structured delta vs the incumbent policy on this account. No second OCR.
+            </p>
+          </div>
+          {appliedWithQuote.map((proposal) => {
+            const payload = proposal.proposed_quote;
+            if (!proposal.quote_id) return null;
+            return (
+              <div key={proposal.id} className="space-y-3">
+                <p className="text-sm text-cc-text-muted">
+                  {proposal.carrier_name} · booked quote
+                </p>
+                <QuoteVsIncumbentComparison
+                  accountId={accountId}
+                  quoteId={proposal.quote_id}
+                  quoteLineOfBusiness={payload.quote.line_of_business}
+                  policyNumberHint={snapshot.policy_number}
+                  carrierHint={proposal.carrier_name}
+                  claimsMade={snapshot.claims_made}
+                  defenseInsideLimits={snapshot.defense_inside_limits}
+                />
+              </div>
+            );
+          })}
+        </CardContent>
+      ) : null}
     </Card>
   );
 }

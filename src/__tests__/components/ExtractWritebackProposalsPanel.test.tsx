@@ -55,13 +55,17 @@ beforeEach(() => {
   useExtractWritebackProposals.mockReset();
   useExtractWritebackProposals.mockReturnValue({
     proposals: [],
+    appliedProposals: [],
     proposalsLoading: false,
+    appliedProposalsLoading: false,
     proposalsFetching: false,
     proposalsError: null,
     ensuring: false,
     rejecting: false,
+    confirming: false,
     ensureProposals: vi.fn(),
     rejectProposal: vi.fn(),
+    confirmProposal: vi.fn(),
   });
 });
 
@@ -69,13 +73,17 @@ describe('ExtractWritebackProposalsPanel ensure→refetch visibility', () => {
   it('stays visible with skeletons while proposals refetch after ensure completes', () => {
     useExtractWritebackProposals.mockReturnValue({
       proposals: [],
+      appliedProposals: [],
       proposalsLoading: false,
+      appliedProposalsLoading: false,
       proposalsFetching: true,
       proposalsError: null,
       ensuring: false,
       rejecting: false,
+      confirming: false,
       ensureProposals: vi.fn(),
       rejectProposal: vi.fn(),
+      confirmProposal: vi.fn(),
     });
 
     const { container } = renderPanel();
@@ -87,13 +95,17 @@ describe('ExtractWritebackProposalsPanel ensure→refetch visibility', () => {
   it('stays visible with skeletons while ensure is in flight', () => {
     useExtractWritebackProposals.mockReturnValue({
       proposals: [],
+      appliedProposals: [],
       proposalsLoading: false,
+      appliedProposalsLoading: false,
       proposalsFetching: false,
       proposalsError: null,
       ensuring: true,
       rejecting: false,
+      confirming: false,
       ensureProposals: vi.fn(),
       rejectProposal: vi.fn(),
+      confirmProposal: vi.fn(),
     });
 
     const { container } = renderPanel();

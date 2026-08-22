@@ -23,6 +23,8 @@ export interface ExtractWritebackProposalRow {
   line_class: LineCategory;
   status: ExtractWritebackProposalStatus;
   proposed_quote: ProposedQuotePayload;
+  quote_id?: string | null;
+  applied_at?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -59,6 +61,28 @@ export function useExtractWritebackProposals({
   const lastEnsuredKey = useRef<string | null>(null);
 
   const isActive = enabled && !!accountId;
+
+  const appliedProposalsQuery = useQuery({
+    queryKey: [PROPOSALS_QUERY_KEY, 'applied', analysisId, accountId, snapshot],
+    queryFn: async () => {
+      if (!accountId) return [] as ExtractWritebackProposalRow[];
+
+      const snapshotHash = await hashExtractSnapshot(snapshot);
+      const { data, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from('extract_writeback_proposals' as any)
+        .select('*')
+        .eq('document_analysis_id', analysisId)
+        .eq('account_id', accountId)
+        .eq('status', 'applied')
+        .eq('snapshot_hash', snapshotHash)
+        .order('applied_at', { ascending: false });
+
+      if (error) throw error;
+      return (data ?? []) as ExtractWritebackProposalRow[];
+    },
+    enabled: isActive,
+  });
 
   const proposalsQuery = useQuery({
     queryKey: proposalsQueryKey(analysisId, accountId ?? '', snapshot),
@@ -189,6 +213,9 @@ export function useExtractWritebackProposals({
         queryClient.invalidateQueries({
           queryKey: proposalsQueryKey(analysisId, accountId, snapshot),
         });
+        queryClient.invalidateQueries({
+          queryKey: [PROPOSALS_QUERY_KEY, 'applied', analysisId, accountId, snapshot],
+        });
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
         queryClient.invalidateQueries({ queryKey: ['quotes', 'account', accountId] });
       }
@@ -261,7 +288,9 @@ export function useExtractWritebackProposals({
 
   return {
     proposals: proposalsQuery.data ?? [],
+    appliedProposals: appliedProposalsQuery.data ?? [],
     proposalsLoading: proposalsQuery.isLoading,
+    appliedProposalsLoading: appliedProposalsQuery.isLoading,
     proposalsFetching: proposalsQuery.isFetching,
     proposalsError: proposalsQuery.error,
     ensuring,
