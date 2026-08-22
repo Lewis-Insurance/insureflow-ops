@@ -12,6 +12,47 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { runPhase0DocumentExtract } from '../_shared/phase0Extract.ts';
+
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
+
+/**
+ * Keep background work alive after the HTTP response on Supabase Edge.
+ * Falls back to await when EdgeRuntime.waitUntil is unavailable (local dev).
+ */
+async function scheduleBackgroundWork(work: Promise<unknown>): Promise<void> {
+  const bounded = work.catch((err) => {
+    console.error('[document-collection] Background work failed:', err);
+  });
+
+  if (typeof EdgeRuntime !== 'undefined' && typeof EdgeRuntime.waitUntil === 'function') {
+    EdgeRuntime.waitUntil(bounded);
+    return;
+  }
+
+  await bounded;
+}
+
+async function assertStaffAccess(
+  req: Request,
+  supabaseUrl: string,
+  corsHeaders: Record<string, string>,
+): Promise<Response | null> {
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const caller = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+  });
+
+  const { data: isStaff, error: staffErr } = await caller.rpc('is_staff');
+  if (staffErr || isStaff !== true) {
+    return new Response(
+      JSON.stringify({ error: 'Staff access required' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  return null;
+}
 
 interface CreatePacketRequest {
   action: 'create_packet';
@@ -84,6 +125,11 @@ interface GetPacketDataRequest {
   token?: string;
 }
 
+interface ProcessCollectionUploadRequest {
+  action: 'process_collection_upload';
+  upload_id: string;
+}
+
 type RequestBody = 
   | CreatePacketRequest 
   | GenerateTokenRequest 
@@ -93,7 +139,8 @@ type RequestBody =
   | PortalSubmitCompleteRequest
   | UpdateStatusRequest
   | SendReminderRequest
-  | GetPacketDataRequest;
+  | GetPacketDataRequest
+  | ProcessCollectionUploadRequest;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -185,6 +232,20 @@ serve(async (req) => {
 
       case 'get_packet_data':
         result = await getPacketData(supabase, body as GetPacketDataRequest, userId, clientIp);
+        break;
+
+      case 'process_collection_upload':
+        if (!userId) {
+          return new Response(
+            JSON.stringify({ error: 'Authentication required' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        {
+          const staffDenied = await assertStaffAccess(req, supabaseUrl, corsHeaders);
+          if (staffDenied) return staffDenied;
+        }
+        result = await processCollectionUpload(supabase, body as ProcessCollectionUploadRequest, userId);
         break;
 
       default:
@@ -598,18 +659,19 @@ async function portalUpload(
     .from('documents')
     .insert({
       account_id: requirement.workspaces.account_id,
-      uploaded_by: null, // Portal upload - no auth user
-      path: filePath,
+      uploaded_by: null,
+      storage_path: filePath,
+      storage_bucket: 'documents',
       filename,
-      content_type: mime_type,
-      size_bytes: fileSizeBytes,
+      mime_type,
+      file_size: fileSizeBytes,
       kind: requirement.doc_type,
     })
     .select()
     .single();
 
-  if (docError) {
-    console.error('[document-collection] Document record error:', docError);
+  if (docError || !document?.id) {
+    throw new Error(`Failed to create document record: ${docError?.message ?? 'missing id'}`);
   }
 
   // Create collection upload record
@@ -617,7 +679,7 @@ async function portalUpload(
     .from('collection_uploads')
     .insert({
       requirement_id,
-      document_id: document?.id,
+      document_id: document.id,
       filename,
       file_path: filePath,
       file_size_bytes: fileSizeBytes,
@@ -634,8 +696,16 @@ async function portalUpload(
     throw new Error(`Failed to record upload: ${uploadRecordError.message}`);
   }
 
-  // Trigger document processing (async)
-  triggerDocumentProcessing(supabase, document?.id, upload.id, requirement.workspaces.account_id);
+  // Phase 0 extract runs after response via EdgeRuntime.waitUntil (or await fallback).
+  await scheduleBackgroundWork(
+    triggerCollectionExtract(supabase, {
+      documentId: document.id,
+      uploadId: upload.id,
+      accountId: requirement.workspaces.account_id,
+      filename,
+      createdBy: null,
+    }),
+  );
 
   // Log upload
   await supabase.from('collection_audit_log').insert({
@@ -650,44 +720,161 @@ async function portalUpload(
 
   return {
     upload_id: upload.id,
-    document_id: document?.id,
+    document_id: document.id,
     filename,
   };
 }
 
-// Trigger document processing pipeline
-async function triggerDocumentProcessing(
+interface TriggerCollectionExtractParams {
+  documentId: string | null;
+  uploadId: string;
+  accountId: string;
+  filename: string;
+  createdBy: string | null;
+}
+
+async function triggerCollectionExtract(
   supabase: any,
-  documentId: string | null,
-  uploadId: string,
-  accountId: string
-) {
-  if (!documentId) return;
+  params: TriggerCollectionExtractParams,
+): Promise<{ analysis_id: string }> {
+  const { documentId, uploadId, accountId, filename, createdBy } = params;
+
+  if (!documentId) {
+    await supabase
+      .from('collection_uploads')
+      .update({
+        processing_status: 'failed',
+        processing_error: 'Document record missing',
+        processing_completed_at: new Date().toISOString(),
+      })
+      .eq('id', uploadId);
+    throw new Error('Document record missing');
+  }
+
+  await supabase
+    .from('collection_uploads')
+    .update({
+      processing_status: 'processing',
+      processing_started_at: new Date().toISOString(),
+      processing_error: null,
+    })
+    .eq('id', uploadId);
+
+  let extractionId: string | null = null;
 
   try {
-    // Create extraction job
     const { data: extraction } = await supabase
       .from('document_extractions')
       .insert({
-        document_url: '', // Will be populated by processing
-        document_name: '',
+        document_url: '',
+        document_name: filename,
         document_type: 'other',
         account_id: accountId,
-        status: 'pending',
+        status: 'processing',
+        extraction_started_at: new Date().toISOString(),
       })
-      .select()
+      .select('id')
       .single();
 
-    if (extraction) {
-      // Link extraction to upload
+    if (extraction?.id) {
+      extractionId = extraction.id;
       await supabase
         .from('collection_uploads')
-        .update({ extraction_id: extraction.id, processing_status: 'processing' })
+        .update({ extraction_id: extraction.id })
         .eq('id', uploadId);
     }
-  } catch (error) {
-    console.error('[document-collection] Failed to trigger processing:', error);
+
+    const result = await runPhase0DocumentExtract(supabase, {
+      documentId,
+      fileName: filename,
+      accountId,
+      createdBy,
+    });
+
+    await supabase
+      .from('collection_uploads')
+      .update({
+        processing_status: 'extracted',
+        processing_completed_at: new Date().toISOString(),
+        processing_error: null,
+      })
+      .eq('id', uploadId);
+
+    if (extractionId) {
+      await supabase
+        .from('document_extractions')
+        .update({
+          status: 'extracted',
+          extraction_completed_at: new Date().toISOString(),
+        })
+        .eq('id', extractionId);
+    }
+
+    return { analysis_id: result.analysisId };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    await supabase
+      .from('collection_uploads')
+      .update({
+        processing_status: 'failed',
+        processing_error: message,
+        processing_completed_at: new Date().toISOString(),
+      })
+      .eq('id', uploadId);
+
+    if (extractionId) {
+      await supabase
+        .from('document_extractions')
+        .update({
+          status: 'failed',
+          error_message: message,
+          extraction_completed_at: new Date().toISOString(),
+        })
+        .eq('id', extractionId);
+    }
+
+    throw error;
   }
+}
+
+async function processCollectionUpload(
+  supabase: any,
+  request: ProcessCollectionUploadRequest,
+  userId: string,
+): Promise<{ analysis_id: string }> {
+  const { upload_id } = request;
+
+  const { data: upload, error: uploadError } = await supabase
+    .from('collection_uploads')
+    .select(`
+      id,
+      document_id,
+      filename,
+      collection_requirements!inner (
+        workspace_id,
+        workspaces!inner (account_id)
+      )
+    `)
+    .eq('id', upload_id)
+    .single();
+
+  if (uploadError || !upload) {
+    throw new Error(`Upload not found: ${uploadError?.message ?? 'missing'}`);
+  }
+
+  const accountId = upload.collection_requirements?.workspaces?.account_id;
+  if (!accountId) {
+    throw new Error('Could not resolve account for upload');
+  }
+
+  return triggerCollectionExtract(supabase, {
+    documentId: upload.document_id,
+    uploadId: upload.id,
+    accountId,
+    filename: upload.filename,
+    createdBy: userId,
+  });
 }
 
 // =============================================================================

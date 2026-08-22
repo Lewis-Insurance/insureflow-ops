@@ -552,7 +552,7 @@ export function useAgentUpload() {
       // Get requirement to find workspace and account
       const { data: requirement } = await supabase
         .from('collection_requirements')
-        .select('workspace_id, workspaces!inner(account_id)')
+        .select('workspace_id, doc_type, workspaces!inner(account_id)')
         .eq('id', requirement_id)
         .single();
 
@@ -573,25 +573,31 @@ export function useAgentUpload() {
       const { data: { user } } = await supabase.auth.getUser();
 
       // Create document record
-      const { data: document } = await supabase
+      const { data: document, error: docError } = await supabase
         .from('documents')
         .insert({
           account_id: (requirement.workspaces as any).account_id,
           uploaded_by: user?.id,
-          path: filePath,
+          storage_path: filePath,
+          storage_bucket: 'documents',
           filename: file.name,
-          content_type: file.type,
-          size_bytes: file.size,
+          mime_type: file.type,
+          file_size: file.size,
+          kind: requirement.doc_type || 'insurance_document',
         })
         .select()
         .single();
+
+      if (docError || !document?.id) {
+        throw new Error(`Failed to create document record: ${docError?.message ?? 'missing id'}`);
+      }
 
       // Create upload record
       const { data: upload, error: uploadRecordError } = await supabase
         .from('collection_uploads')
         .insert({
           requirement_id,
-          document_id: document?.id,
+          document_id: document.id,
           filename: file.name,
           file_path: filePath,
           file_size_bytes: file.size,
@@ -605,6 +611,13 @@ export function useAgentUpload() {
         .single();
 
       if (uploadRecordError) throw uploadRecordError;
+
+      // Fire-and-forget Phase 0 extract via edge function
+      supabase.functions.invoke('document-collection', {
+        body: { action: 'process_collection_upload', upload_id: upload.id },
+      }).catch((err) => {
+        console.error('[useAgentUpload] extract trigger failed:', err);
+      });
 
       return upload;
     },

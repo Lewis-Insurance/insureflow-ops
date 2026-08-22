@@ -574,9 +574,12 @@ function RequirementCard({ requirement, token, canUpload: canUploadProp = true, 
 
         {/* Complete State */}
         {isComplete && (
-          <div className="flex items-center justify-center gap-3 py-3 bg-emerald-50 rounded-xl">
-            <CheckCircle2 className="h-6 w-6 text-emerald-600" />
-            <span className="font-semibold text-emerald-700">Document received</span>
+          <div className="flex flex-col items-center justify-center gap-1 py-3 bg-emerald-50 rounded-xl">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+              <span className="font-semibold text-emerald-700">Document received</span>
+            </div>
+            <p className="text-xs text-emerald-600">We received it. Your agent will review.</p>
           </div>
         )}
       </div>
