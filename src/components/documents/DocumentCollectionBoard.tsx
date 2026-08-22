@@ -32,7 +32,6 @@ import {
   Link2,
   Eye,
   RefreshCw,
-  Bell,
   Inbox,
   FileCheck,
   FileClock,
@@ -47,7 +46,7 @@ import {
   useCollectionRequirements,
   useCollectionStatusSummary,
   useUpdateUploadStatus,
-  useSendReminder,
+  useCopyCollectionLink,
   useAgentUpload,
   CollectionPacket,
   CollectionRequirement,
@@ -230,14 +229,87 @@ function PacketDetail({ packet, onSelectRequirement }: PacketDetailProps) {
   const { toast } = useToast();
   const { data: requirements = [], isLoading } = useCollectionRequirements(packet.id);
   const { data: statusSummary } = useCollectionStatusSummary(packet.id);
-  const sendReminder = useSendReminder();
+  const copyLink = useCopyCollectionLink();
+  const [emailPending, setEmailPending] = useState(false);
 
-  const handleCopyLink = async () => {
-    // This would get the portal URL - for now just show toast
-    toast({
-      title: 'Link Copied',
-      description: 'Portal link has been copied to clipboard.',
-    });
+  const recipientEmail = packet.accounts?.email;
+
+  const handleCopyLink = () => {
+    copyLink.mutate(
+      {
+        workspace_id: packet.id,
+        recipient_email: recipientEmail || undefined,
+        recipient_name: packet.accounts?.name,
+      },
+      {
+        onSuccess: async (result) => {
+          const url = result.portal_url;
+          if (!url) {
+            toast({
+              title: 'Error',
+              description: 'Could not generate portal link.',
+              variant: 'destructive',
+            });
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(url);
+            toast({
+              title: 'Link Copied',
+              description: 'Portal link has been copied to clipboard.',
+            });
+          } catch {
+            toast({
+              title: 'Copy Failed',
+              description: 'Could not copy to clipboard. Use Open in Email instead.',
+              variant: 'destructive',
+            });
+          }
+        },
+        onError: (error) => {
+          toast({
+            title: 'Error',
+            description: error.message,
+            variant: 'destructive',
+          });
+        },
+      },
+    );
+  };
+
+  const handleOpenInEmail = () => {
+    setEmailPending(true);
+    copyLink.mutate(
+      {
+        workspace_id: packet.id,
+        recipient_email: recipientEmail || undefined,
+        recipient_name: packet.accounts?.name,
+      },
+      {
+        onSuccess: (result) => {
+          const url = result.portal_url;
+          if (!url) {
+            toast({
+              title: 'Error',
+              description: 'Could not generate portal link.',
+              variant: 'destructive',
+            });
+            return;
+          }
+          const subject = encodeURIComponent('Document request');
+          const body = encodeURIComponent(`Please upload your documents here: ${url}`);
+          window.open(`mailto:${recipientEmail || ''}?subject=${subject}&body=${body}`, '_blank');
+        },
+        onError: (error) => {
+          toast({
+            title: 'Error',
+            description: error.message,
+            variant: 'destructive',
+          });
+        },
+        onSettled: () => setEmailPending(false),
+      },
+    );
   };
 
   return (
@@ -277,23 +349,30 @@ function PacketDetail({ packet, onSelectRequirement }: PacketDetailProps) {
               variant="outline" 
               size="sm"
               onClick={handleCopyLink}
+              disabled={copyLink.isPending}
             >
-              <Link2 className="h-4 w-4 mr-1" />
-              Copy Link
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => sendReminder.mutate(packet.id)}
-              disabled={sendReminder.isPending}
-            >
-              {sendReminder.isPending ? (
+              {copyLink.isPending ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
               ) : (
-                <Bell className="h-4 w-4 mr-1" />
+                <Link2 className="h-4 w-4 mr-1" />
               )}
-              Remind
+              Copy Link
             </Button>
+            {recipientEmail && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleOpenInEmail}
+                disabled={emailPending}
+              >
+                {emailPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-1" />
+                )}
+                Open in Email
+              </Button>
+            )}
           </div>
         </div>
       )}

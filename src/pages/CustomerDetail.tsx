@@ -22,6 +22,7 @@ import { FleetCard } from '@/components/commercial/FleetCard';
 import { DriversCard } from '@/components/commercial/DriversCard';
 import { WorkersCompCard } from '@/components/commercial/WorkersCompCard';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
+import { DocumentCollectionLinkCard } from '@/components/documents/DocumentCollectionLinkCard';
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { useTasks } from '@/hooks/useTasks';
 import { useRecentCustomers } from '@/hooks/useRecentCustomers';
@@ -488,6 +489,11 @@ export default function CustomerDetail() {
             <DocumentCollectionBoard accountId={account.id} />
           </ErrorBoundaryWrapper>
           */}
+          <DocumentCollectionLinkCard
+            accountId={account.id}
+            accountEmail={account.email}
+            accountName={account.name}
+          />
           <CustomerDocumentsSection accountId={account.id} />
         </section>
 

@@ -121,6 +121,30 @@ export interface CreatePacketRequest {
   expires_days?: number;
 }
 
+export const collectionPortalUrl = (token: string) =>
+  `${window.location.origin}/portal/collect/${token}`;
+
+async function callDocumentCollectionAction<T>(body: Record<string, unknown>): Promise<T> {
+  const { data: session } = await supabase.auth.getSession();
+
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/document-collection`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.session?.access_token}`,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  const result = await response.json();
+  if (!result.success) throw new Error(result.error);
+
+  return result as T;
+}
+
 // =============================================================================
 // QUERY HOOKS
 // =============================================================================
@@ -285,27 +309,14 @@ export function useCreateCollectionPacket() {
 
   return useMutation({
     mutationFn: async (request: CreatePacketRequest) => {
-      const { data: session } = await supabase.auth.getSession();
-      
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/document-collection`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.session?.access_token}`,
-          },
-          body: JSON.stringify({
-            action: 'create_packet',
-            ...request,
-          }),
-        }
-      );
-
-      const result = await response.json();
-      if (!result.success) throw new Error(result.error);
-      
-      return result;
+      return callDocumentCollectionAction<{
+        workspace_id: string;
+        portal_url?: string;
+        token?: string;
+      }>({
+        action: 'create_packet',
+        ...request,
+      });
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['collection-packets', variables.account_id] });
@@ -327,6 +338,61 @@ export function useCreateCollectionPacket() {
 }
 
 /**
+ * Create a quick single-requirement document collection packet with portal link.
+ */
+export function useQuickDocumentLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      account_id: string;
+      recipient_email?: string;
+      recipient_name?: string;
+    }) => {
+      return callDocumentCollectionAction<{
+        workspace_id: string;
+        portal_url?: string;
+        token?: string;
+      }>({
+        action: 'create_packet',
+        account_id: params.account_id,
+        name: 'Document request',
+        requirements: [
+          { doc_type: 'OTHER', label: 'Documents', is_required: true },
+        ],
+        recipient_email: params.recipient_email,
+        recipient_name: params.recipient_name,
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['collection-packets', variables.account_id] });
+    },
+  });
+}
+
+/**
+ * Generate a portal token for an existing packet (no toast; caller handles UX).
+ */
+export function useCopyCollectionLink() {
+  return useMutation({
+    mutationFn: async (params: {
+      workspace_id: string;
+      recipient_email?: string;
+      recipient_name?: string;
+      expires_days?: number;
+    }) => {
+      return callDocumentCollectionAction<{
+        token: string;
+        portal_url: string;
+      }>({
+        action: 'generate_token',
+        ...params,
+      });
+    },
+  });
+}
+
+/**
  * Generate a new portal access token
  */
 export function useGeneratePortalToken() {
@@ -340,27 +406,13 @@ export function useGeneratePortalToken() {
       recipient_name?: string;
       expires_days?: number;
     }) => {
-      const { data: session } = await supabase.auth.getSession();
-      
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/document-collection`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.session?.access_token}`,
-          },
-          body: JSON.stringify({
-            action: 'generate_token',
-            ...params,
-          }),
-        }
-      );
-
-      const result = await response.json();
-      if (!result.success) throw new Error(result.error);
-      
-      return result;
+      return callDocumentCollectionAction<{
+        token: string;
+        portal_url: string;
+      }>({
+        action: 'generate_token',
+        ...params,
+      });
     },
     onSuccess: () => {
       toast({
@@ -520,10 +572,18 @@ export function useSendReminder() {
       return result;
     },
     onSuccess: (data) => {
-      toast({
-        title: 'Reminder Queued',
-        description: `Reminder will be sent to ${data.recipients} recipient(s).`,
-      });
+      if (data.logged) {
+        toast({
+          title: 'Reminder logged',
+          description: 'No email was sent. Share the portal link with the client directly.',
+        });
+      } else {
+        toast({
+          title: 'Reminder not logged',
+          description: data.message || 'No active portal tokens found for this packet.',
+          variant: 'destructive',
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
