@@ -68,6 +68,14 @@ export function getAnalysisTermDates(row: DocumentAnalysisExtractRow): {
   return { effective, expiration };
 }
 
+export function getAnalysisPolicyNumber(row: DocumentAnalysisExtractRow): string | null {
+  const snapshot = readExtractSnapshot(row.analysis_result ?? row.extracted_data);
+  const fromColumn = row.policy_number?.trim();
+  if (fromColumn) return fromColumn;
+  const fromSnapshot = snapshot?.policy_number?.trim();
+  return fromSnapshot || null;
+}
+
 export function isCompletedDocumentAnalysis(row: DocumentAnalysisExtractRow): boolean {
   if (!COMPLETED_STATUSES.has(row.processing_status ?? '')) return false;
   const hasPayload =
@@ -109,7 +117,7 @@ export function analysisMatchesRenewalIdentity(
   }
 
   const renewalPolicy = normalizePolicyNumber(renewal.policy_number);
-  const analysisPolicy = normalizePolicyNumber(row.policy_number);
+  const analysisPolicy = normalizePolicyNumber(getAnalysisPolicyNumber(row));
   return renewalPolicy !== '' && analysisPolicy !== '' && renewalPolicy === analysisPolicy;
 }
 

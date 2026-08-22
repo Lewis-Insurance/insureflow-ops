@@ -84,6 +84,17 @@ describe('aoRenewalExtractSignal', () => {
     expect(pickThisTermExtractForRenewal(renewal, [analysis])?.id).toBe('analysis-this-term');
   });
 
+  it('matches identity from snapshot when column policy_number is null', () => {
+    const renewal = BASE_RENEWAL;
+    const analysis = makeAnalysis({
+      id: 'analysis-snapshot-policy',
+      account_id: null,
+      policy_number: null,
+    });
+
+    expect(pickThisTermExtractForRenewal(renewal, [analysis])?.id).toBe('analysis-snapshot-policy');
+  });
+
   it('does not count old or other-term extracts', () => {
     const renewal = BASE_RENEWAL;
     const oldTerm = makeAnalysis({

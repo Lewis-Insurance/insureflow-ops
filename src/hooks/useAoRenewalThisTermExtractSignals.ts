@@ -41,12 +41,17 @@ async function fetchAnalysesByPolicyNumbers(
 ): Promise<DocumentAnalysisExtractRow[]> {
   const rows: DocumentAnalysisExtractRow[] = [];
   for (const numbers of chunk(policyNumbers, CHUNK_SIZE)) {
+    const orFilter = [
+      `policy_number.in.(${numbers.join(',')})`,
+      ...numbers.map((n) => `analysis_result->>policy_number.eq.${n}`),
+    ].join(',');
+
     const { data, error } = await supabase
       .from('document_analysis')
       .select(
         'id, account_id, policy_number, effective_date, expiration_date, processing_status, analysis_result, extracted_data, created_at',
       )
-      .in('policy_number', numbers)
+      .or(orFilter)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
