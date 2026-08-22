@@ -32,6 +32,11 @@ describe('document collection link clipboard', () => {
 
   beforeEach(() => {
     writeText.mockClear();
+    Object.defineProperty(window, 'location', {
+      value: { origin: 'https://lewisinsurance.ai' },
+      writable: true,
+      configurable: true,
+    });
     Object.assign(navigator, {
       clipboard: { writeText },
     });
