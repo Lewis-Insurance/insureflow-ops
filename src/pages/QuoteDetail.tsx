@@ -39,7 +39,6 @@ export default function QuoteDetail() {
           account:accounts!quotes_account_id_fkey(
             id,
             name,
-            email,
             type,
             industry
           ),
@@ -235,11 +234,7 @@ export default function QuoteDetail() {
         )}
 
         {quote.account_id && (
-          <DocumentCollectionLinkCard
-            accountId={quote.account_id}
-            accountEmail={quote.account?.email}
-            accountName={quote.account?.name}
-          />
+          <DocumentCollectionLinkCard accountId={quote.account_id} />
         )}
 
         {/* Follow-up timeline + stats */}

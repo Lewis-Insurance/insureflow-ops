@@ -831,7 +831,6 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
           open={addQuoteOpen}
           onOpenChange={setAddQuoteOpen}
           accountId={addQuoteAccountId}
-          accountName={`${lead.first_name} ${lead.last_name}`}
         />
       )}
 

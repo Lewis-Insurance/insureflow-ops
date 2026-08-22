@@ -954,7 +954,6 @@ export default function LeadDetail() {
           open={addQuoteOpen}
           onOpenChange={setAddQuoteOpen}
           accountId={addQuoteAccountId}
-          accountName={displayName.fullName}
         />
       )}
 
