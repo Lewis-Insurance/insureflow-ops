@@ -7,7 +7,10 @@ import {
   fetchAllSupabaseRows,
   mapRenewalIntelligenceSummaryRow,
 } from '@/lib/renewalIntelligenceSummary';
-import { useRenewalIntelligenceSummary } from '@/hooks/useRenewalIntelligence';
+import {
+  useAtRiskRenewals,
+  useRenewalIntelligenceSummary,
+} from '@/hooks/useRenewalIntelligence';
 
 describe('mapRenewalIntelligenceSummaryRow', () => {
   it('returns empty summary for null/undefined rows', () => {
@@ -81,13 +84,66 @@ describe('fetchAllSupabaseRows', () => {
 });
 
 const rpcMock = vi.fn();
+const fromMock = vi.fn();
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     rpc: (...args: unknown[]) => rpcMock(...args),
-    from: vi.fn(),
+    from: (...args: unknown[]) => fromMock(...args),
   },
 }));
+
+function createQueryWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
+  return ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
+describe('useAtRiskRenewals', () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  it('uses a unique tie-breaker and returns every id once across equal-score pages', async () => {
+    const allRows = [
+      ...Array.from({ length: 1000 }, (_, i) => ({ id: `row-${i}`, risk_score: 75 })),
+      ...Array.from({ length: 17 }, (_, i) => ({ id: `row-${1000 + i}`, risk_score: 75 })),
+    ];
+
+    const builder: Record<string, ReturnType<typeof vi.fn>> = {};
+    builder.select = vi.fn(() => builder);
+    builder.not = vi.fn(() => builder);
+    builder.gte = vi.fn(() => builder);
+    builder.in = vi.fn(() => builder);
+    builder.order = vi.fn(() => builder);
+    builder.range = vi.fn(async (from: number, to: number) => ({
+      data: allRows.slice(from, to + 1),
+      error: null,
+    }));
+    fromMock.mockReturnValue(builder);
+
+    const { result } = renderHook(() => useAtRiskRenewals(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const ids = result.current.data?.map((row) => row.id) ?? [];
+    expect(ids).toHaveLength(1017);
+    expect(new Set(ids).size).toBe(1017);
+    expect(builder.range).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(builder.range).toHaveBeenNthCalledWith(2, 1000, 1999);
+    expect(builder.order.mock.calls).toEqual([
+      ['risk_score', { ascending: false }],
+      ['id', { ascending: true }],
+      ['risk_score', { ascending: false }],
+      ['id', { ascending: true }],
+    ]);
+  });
+});
 
 describe('useRenewalIntelligenceSummary', () => {
   beforeEach(() => {
@@ -111,14 +167,9 @@ describe('useRenewalIntelligenceSummary', () => {
       error: null,
     });
 
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
+    const { result } = renderHook(() => useRenewalIntelligenceSummary(), {
+      wrapper: createQueryWrapper(),
     });
-
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(QueryClientProvider, { client: queryClient }, children);
-
-    const { result } = renderHook(() => useRenewalIntelligenceSummary(), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 

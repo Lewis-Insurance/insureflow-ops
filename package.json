@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:renewal-migrations": "node scripts/test-renewal-intelligence-migrations.mjs",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "storybook": "storybook dev -p 6006",
