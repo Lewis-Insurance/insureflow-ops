@@ -20,6 +20,12 @@ vi.mock('@/hooks/useCustomerTriageCounts', () => ({
   useCustomerTriageCounts: vi.fn(),
 }));
 
+vi.mock('@/hooks/useMyCollectConfirmWaiting', () => ({
+  useMyCollectConfirmWaiting: vi.fn(),
+  MY_COLLECT_CONFIRM_WAITING_KEY: ['my-collect-confirm-waiting'],
+  COLLECT_CONFIRM_WAITING_LIMIT: 6,
+}));
+
 vi.mock('@/hooks/usePolicySearch', () => ({
   usePolicySearch: vi.fn(),
 }));
@@ -41,6 +47,7 @@ import ProducerDashboard from '@/pages/ProducerDashboard';
 import { useMyNeedsMeToday } from '@/hooks/useMyNeedsMeToday';
 import { useAuth } from '@/hooks/useAuth';
 import { useCustomerTriageCounts } from '@/hooks/useCustomerTriageCounts';
+import { useMyCollectConfirmWaiting } from '@/hooks/useMyCollectConfirmWaiting';
 import { usePolicySearch } from '@/hooks/usePolicySearch';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -108,6 +115,36 @@ function mockBookOfBusinessSupabase({
   });
 }
 
+function mockConfirmWaiting(rows: unknown[]) {
+  vi.mocked(useMyCollectConfirmWaiting).mockReturnValue({
+    rows,
+    limit: 6,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  } as unknown as ReturnType<typeof useMyCollectConfirmWaiting>);
+}
+
+function mockRenewalsDue(renewals_due: number) {
+  vi.mocked(useMyNeedsMeToday).mockReturnValue({
+    counts: { renewals_due, overdue_tasks: 1, new_leads: 3 },
+    total: renewals_due + 4,
+    loading: false,
+    refetch: vi.fn(),
+  });
+}
+
+const CONFIRM_ROW = {
+  analysis_id: 'analysis-1',
+  account_id: 'acct-1',
+  account_name: 'Acme Manufacturing LLC',
+  upload_id: 'upload-1',
+  filename: 'dec-page.pdf',
+  uploaded_at: '2026-08-22T14:05:00Z',
+  pending_count: 1,
+  line_class: 'commercial',
+};
+
 function renderProducerDashboard() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -142,6 +179,8 @@ beforeEach(() => {
     loading: false,
     refetch: vi.fn(),
   } as ReturnType<typeof useCustomerTriageCounts>);
+
+  mockConfirmWaiting([]);
 
   vi.mocked(usePolicySearch).mockReturnValue({
     policies: [],
@@ -189,5 +228,64 @@ describe('ProducerDashboard', () => {
     expect(
       bookSection.compareDocumentPosition(myTasksLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  describe('lime budget with Portal came back', () => {
+    it('card present and renewals due: card owns lime, header button is outline', async () => {
+      mockRenewalsDue(2);
+      mockConfirmWaiting([CONFIRM_ROW]);
+      const { container } = renderProducerDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText('Portal came back')).toBeInTheDocument();
+      });
+
+      const primaries = container.querySelectorAll('[data-primary]');
+      expect(primaries).toHaveLength(1);
+      expect(primaries[0].textContent).toContain('Confirm write-back');
+
+      const header = screen.getByRole('button', { name: /Work renewals/ });
+      expect(header).not.toHaveAttribute('data-primary');
+    });
+
+    it('card absent and renewals due: header button is the lime primary', async () => {
+      mockRenewalsDue(2);
+      mockConfirmWaiting([]);
+      const { container } = renderProducerDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText('Insureds by Type')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('Portal came back')).not.toBeInTheDocument();
+      const primaries = container.querySelectorAll('[data-primary]');
+      expect(primaries).toHaveLength(1);
+      expect(primaries[0].textContent).toContain('Work renewals');
+    });
+
+    it('card present and no renewals due: exactly one lime on the card', async () => {
+      mockRenewalsDue(0);
+      mockConfirmWaiting([CONFIRM_ROW]);
+      const { container } = renderProducerDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText('Portal came back')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('button', { name: /Work renewals/ })).not.toBeInTheDocument();
+      expect(container.querySelectorAll('[data-primary]')).toHaveLength(1);
+    });
+
+    it('card absent and no renewals due: zero lime', async () => {
+      mockRenewalsDue(0);
+      mockConfirmWaiting([]);
+      const { container } = renderProducerDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText('Insureds by Type')).toBeInTheDocument();
+      });
+
+      expect(container.querySelectorAll('[data-primary]')).toHaveLength(0);
+    });
   });
 });

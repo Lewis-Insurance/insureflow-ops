@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { MY_COLLECT_CONFIRM_WAITING_KEY } from '@/hooks/useMyCollectConfirmWaiting';
 import type { ExtractSnapshotV1 } from '@/lib/extractSnapshot';
 import type { LineCategory } from '@/lib/extractAccountMatch';
 import {
@@ -185,6 +186,7 @@ export function useExtractWritebackProposals({
           queryKey: proposalsQueryKey(analysisId, accountId, snapshot),
         });
       }
+      queryClient.invalidateQueries({ queryKey: MY_COLLECT_CONFIRM_WAITING_KEY });
       toast({
         title: 'Proposal rejected',
         description: 'This write-back proposal was dismissed.',
@@ -219,6 +221,7 @@ export function useExtractWritebackProposals({
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
         queryClient.invalidateQueries({ queryKey: ['quotes', 'account', accountId] });
       }
+      queryClient.invalidateQueries({ queryKey: MY_COLLECT_CONFIRM_WAITING_KEY });
       toast({
         title: 'Quote booked',
         description: 'The extracted quote was added to the account.',

@@ -23,6 +23,11 @@ const documentCollectionSource = readFileSync(documentCollectionPath, 'utf8');
 const phase0ExtractSource = readFileSync(phase0ExtractPath, 'utf8');
 const applyWritebackSql = readFileSync(applyWritebackMigrationPath, 'utf8');
 const persistLinkSql = readFileSync(persistLinkMigrationPath, 'utf8');
+const sharedProposalPath = resolve(
+  import.meta.dirname,
+  '../../../supabase/functions/_shared/extractWritebackProposal.ts',
+);
+const sharedProposalSource = readFileSync(sharedProposalPath, 'utf8');
 
 describe('collection portal extract pipeline', () => {
   it('uses shared runPhase0DocumentExtract for collection uploads', () => {
@@ -39,10 +44,49 @@ describe('collection portal extract pipeline', () => {
 
   it('does not auto-apply write-back from collection path', () => {
     expect(documentCollectionSource).not.toMatch(/apply_extract_writeback_proposal/);
-    expect(documentCollectionSource).not.toMatch(/extract_writeback_proposals/);
+    expect(documentCollectionSource).not.toMatch(/\.update\(\{ status: 'rejected' \}\)/);
     expect(applyWritebackSql).toMatch(/if not public\.is_staff\(\) then/i);
     expect(applyWritebackSql).toMatch(
       /revoke all on function public\.apply_extract_writeback_proposal\(uuid\) from anon, public/i,
+    );
+  });
+
+  it('ensures pending write-back proposals server-side after Phase 0 success', () => {
+    expect(documentCollectionSource).toMatch(
+      /import\s*\{[^}]*ensureExtractWritebackProposals[^}]*\}\s*from\s*['"]\.\.\/_shared\/extractWritebackProposal\.ts['"]/,
+    );
+    expect(documentCollectionSource).toMatch(/await ensureExtractWritebackProposals\(supabase,/);
+    expect(documentCollectionSource).toMatch(/snapshot: result\.analysisResult/);
+
+    // Shared module only writes status 'pending' via upsert-ignore, never apply, never supersede.
+    expect(sharedProposalSource).toMatch(/status: 'pending' as const/);
+    expect(sharedProposalSource).toMatch(/ignoreDuplicates: true/);
+    expect(sharedProposalSource).not.toMatch(/apply_extract_writeback_proposal/);
+    expect(sharedProposalSource).not.toMatch(/status: 'rejected'/);
+  });
+
+  it('calls ensure after runPhase0DocumentExtract and before processing_status extracted', () => {
+    const triggerFn = documentCollectionSource.match(
+      /async function triggerCollectionExtract\([\s\S]*?\n\}/,
+    )?.[0];
+    expect(triggerFn).toBeTruthy();
+    expect(triggerFn).toMatch(
+      /await runPhase0DocumentExtract\([\s\S]*?await ensureExtractWritebackProposals\([\s\S]*?processing_status:\s*'extracted'/,
+    );
+    // Failure isolation: the ensure call is wrapped and logs ids/counts only.
+    expect(triggerFn).toMatch(/try \{\s*const ensured = await ensureExtractWritebackProposals/);
+    expect(triggerFn).toMatch(/Proposal ensure failed/);
+    const ensureLog = triggerFn?.match(/Proposals ensured[\s\S]*?\}\);/)?.[0] ?? '';
+    expect(ensureLog).not.toMatch(/filename|snapshot|account_name/);
+  });
+
+  it('writes token_id into the document_uploaded audit row', () => {
+    const portalUploadFn = documentCollectionSource.match(
+      /async function portalUpload\([\s\S]*?\n\}/,
+    )?.[0];
+    expect(portalUploadFn).toBeTruthy();
+    expect(portalUploadFn).toMatch(
+      /action:\s*'document_uploaded'[\s\S]*?new_value:\s*\{[^}]*token_id:\s*tokenValidation\.token_id/,
     );
   });
 
