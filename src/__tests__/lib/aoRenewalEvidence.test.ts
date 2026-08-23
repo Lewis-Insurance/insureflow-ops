@@ -119,9 +119,25 @@ describe('quotes, items, and touches', () => {
     expect(evidence.items).toEqual({ missingCount: 1, inReviewCount: 2, totalCount: 4, allRequiredComplete: false });
   });
 
-  it('takes the newest touch and treats exactly seven days as recent', () => {
-    expect(deriveLastTouchEvidence('2026-05-20', '2026-05-25', '2026-06-01')).toMatchObject({ state: 'recent', daysAgo: 7, lastTouchAt: '2026-05-25' });
+  it('treats an empty packet rollup as no real requirements and keeps Get dec available', () => {
+    const evidence = buildAoRenewalEvidence({ renewal, documents: [], quotes: [], fallbackQuotes: [], today: '2026-06-01',
+      rollup: { account_id: 'account-1', ao_renewal_id: null, has_packet: true, total_count: 0,
+        missing_count: 0, in_review_count: 0, all_required_complete: true, last_touch_at: null } });
+    expect(evidence.items).toBeNull();
+    expect(evidence.nextHole.kind).toBe('get_dec');
+  });
+
+  it('takes the newest touch and aligns the seven-day stale boundary with the 7+ day queue', () => {
+    expect(deriveLastTouchEvidence('2026-05-20', '2026-05-26', '2026-06-01')).toMatchObject({ state: 'recent', daysAgo: 6, lastTouchAt: '2026-05-26' });
+    expect(deriveLastTouchEvidence('2026-05-20', '2026-05-25', '2026-06-01')).toMatchObject({ state: 'stale', daysAgo: 7, lastTouchAt: '2026-05-25' });
     expect(deriveLastTouchEvidence('2026-05-24', '2026-05-20', '2026-06-01')).toMatchObject({ state: 'stale', daysAgo: 8, lastTouchAt: '2026-05-24' });
     expect(deriveLastTouchEvidence(null, null, '2026-06-01').state).toBe('never');
+  });
+
+  it('uses local calendar dates rather than UTC day boundaries', () => {
+    const today = new Date('2026-06-02T03:30:00.000Z'); // June 1 in the business time zone.
+    expect(deriveLastTouchEvidence(null, '2026-06-01T00:30:00.000Z', today)).toMatchObject({
+      state: 'today', daysAgo: 0,
+    });
   });
 });

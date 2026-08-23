@@ -3,6 +3,11 @@ import {
   deriveAoRenewalEffectiveDate,
   type AoRenewalExtractSignal,
 } from "@/lib/aoRenewalExtractSignal";
+import {
+  differenceFromTodayInLocalDays,
+  extractLocalDate,
+  parseLocalDate,
+} from "@/lib/date/localDate";
 import { lobMatchesPolicyAndQuote } from "@/lib/quoteIncumbent/lineKey";
 
 export interface AoRenewalEvidenceDocumentRow {
@@ -114,11 +119,6 @@ function parseTimestamp(value: string | null | undefined): number | null {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-function startOfUtcDay(value: string | Date): number {
-  const date = value instanceof Date ? value : new Date(value);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
-
 function subtractUtcDays(localDate: string, days: number): number {
   const [year, month, day] = localDate.split("-").map(Number);
   return Date.UTC(year, month - 1, day - days);
@@ -193,14 +193,15 @@ export function deriveLastTouchEvidence(
   const latest = candidates[0];
   if (!latest) return { state: "never", lastTouchAt: null, daysAgo: null };
 
-  const daysAgo = Math.max(
-    0,
-    Math.floor(
-      (startOfUtcDay(today) - startOfUtcDay(latest.value)) / 86_400_000,
-    ),
+  const localToday =
+    today instanceof Date ? today : parseLocalDate(extractLocalDate(today));
+  const localDayDifference = differenceFromTodayInLocalDays(
+    latest.value,
+    localToday,
   );
+  const daysAgo = Math.max(0, -(localDayDifference ?? 0));
   return {
-    state: daysAgo === 0 ? "today" : daysAgo > 7 ? "stale" : "recent",
+    state: daysAgo === 0 ? "today" : daysAgo >= 7 ? "stale" : "recent",
     lastTouchAt: latest.value,
     daysAgo,
   };
@@ -280,7 +281,7 @@ export function buildAoRenewalEvidence(
           quote.renewal_id === renewal.id &&
           (quote.status === "quoted" || quote.status === "selected"),
       ).length;
-  const items = rollup?.has_packet
+  const items = rollup?.has_packet && rollup.total_count > 0
     ? {
         missingCount: rollup.missing_count,
         inReviewCount: rollup.in_review_count,

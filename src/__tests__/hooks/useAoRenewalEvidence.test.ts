@@ -24,7 +24,13 @@ function makeRenewal(id: string, accountId: string | null): AORenewal {
     moved_carrier: null, moved_term: null, moved_premium: null };
 }
 
-const calls = { documents: [] as string[][], quotes: [] as string[][], fallback: [] as string[][] };
+const calls = {
+  documents: [] as string[][],
+  documentFilters: [] as string[],
+  documentOrders: [] as Array<[string, { ascending: boolean }]>,
+  quotes: [] as string[][],
+  fallback: [] as string[][],
+};
 function installBuilders() {
   from.mockImplementation((table: string) => {
     if (table === 'documents' || table === 'quotes') {
@@ -32,7 +38,12 @@ function installBuilders() {
         select: vi.fn(() => builder),
         in: vi.fn((_column: string, ids: string[]) => { calls[table].push(ids); return builder; }),
         eq: vi.fn(() => builder),
-        is: vi.fn(async () => ({ data: [], error: null })),
+        is: vi.fn(() => table === 'documents' ? builder : Promise.resolve({ data: [], error: null })),
+        or: vi.fn((filter: string) => { calls.documentFilters.push(filter); return builder; }),
+        order: vi.fn((column: string, options: { ascending: boolean }) => {
+          calls.documentOrders.push([column, options]);
+          return Promise.resolve({ data: [], error: null });
+        }),
       };
       return builder;
     }
@@ -49,7 +60,7 @@ function installBuilders() {
 
 beforeEach(() => {
   from.mockReset(); rpc.mockReset();
-  calls.documents.length = calls.quotes.length = calls.fallback.length = 0;
+  calls.documents.length = calls.documentFilters.length = calls.documentOrders.length = calls.quotes.length = calls.fallback.length = 0;
   installBuilders();
   rpc.mockResolvedValue({ data: [], error: null });
 });
@@ -69,6 +80,14 @@ describe('useAoRenewalEvidence', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(calls.documents.map((ids) => ids.length)).toEqual([50, 1]);
+    expect(calls.documentFilters).toEqual([
+      'document_type.eq.dec_page,category.eq.dec_page,kind.in.(dec_page,CURRENT_DEC)',
+      'document_type.eq.dec_page,category.eq.dec_page,kind.in.(dec_page,CURRENT_DEC)',
+    ]);
+    expect(calls.documentOrders).toEqual([
+      ['uploaded_at', { ascending: false }],
+      ['uploaded_at', { ascending: false }],
+    ]);
     expect(calls.quotes.map((ids) => ids.length)).toEqual([50, 1]);
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(rpc.mock.calls.map(([, args]) => args.p_account_ids.length)).toEqual([50, 1]);

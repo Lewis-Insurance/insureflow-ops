@@ -37,7 +37,11 @@ async function fetchAccountEvidence(accountIds: string[]) {
           "id, account_id, policy_id, document_type, category, kind, filename, uploaded_at, created_at",
         )
         .in("account_id", ids)
-        .is("deleted_at", null),
+        .is("deleted_at", null)
+        .or(
+          "document_type.eq.dec_page,category.eq.dec_page,kind.in.(dec_page,CURRENT_DEC)",
+        )
+        .order("uploaded_at", { ascending: false }),
       supabase
         .from("quotes")
         .select("id, account_id, line_of_business, premium, created_at")

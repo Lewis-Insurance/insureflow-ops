@@ -28,7 +28,7 @@ as $$
     select
       cw.account_id,
       cw.ao_renewal_id,
-      true as has_packet,
+      (count(cr.id) > 0) as has_packet,
       count(cr.id)::integer as total_count,
       count(cr.id) filter (
         where cr.status in ('not_requested', 'requested', 'rejected', 'expired')
