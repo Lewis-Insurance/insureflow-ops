@@ -7,6 +7,8 @@ export type AoRenewalExtractSignalLabel = 'Extract ready' | 'Confirm extract';
 export interface AoRenewalExtractSignal {
   analysisId: string;
   label: AoRenewalExtractSignalLabel;
+  /** Normalized snapshot classification for read-only evidence consumers. */
+  documentType?: string | null;
 }
 
 export interface DocumentAnalysisExtractRow {
@@ -138,7 +140,19 @@ export function buildAoRenewalExtractSignal(
     ? 'Confirm extract'
     : 'Extract ready';
 
-  return { analysisId: row.id, label };
+  const snapshot = readExtractSnapshot(row.analysis_result ?? row.extracted_data);
+  const documentType = snapshot?.document_type;
+  const signal: AoRenewalExtractSignal = { analysisId: row.id, label };
+  if (documentType) {
+    // Keep the original #142 enumerable contract byte-for-byte while making already-fetched
+    // classification metadata available to in-process evidence derivation.
+    Object.defineProperty(signal, 'documentType', {
+      value: documentType,
+      enumerable: false,
+      writable: false,
+    });
+  }
+  return signal;
 }
 
 export function buildAoRenewalExtractSignalMap(

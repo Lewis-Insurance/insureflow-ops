@@ -119,6 +119,7 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
+      queryClient.invalidateQueries({ queryKey: ["ao-renewal-evidence"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", renewalId] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
