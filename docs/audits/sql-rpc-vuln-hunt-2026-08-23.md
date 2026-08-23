@@ -3,7 +3,8 @@
 Commit: `e4e7c6c6a61685066add54c5d4a79473d7392bbb`  
 Run: `bc-25b7e70b-c835-4caa-ae14-5296b71a66a9`  
 Scope: `/workspace/supabase/migrations/` PostgREST-reachable RLS + SECURITY DEFINER RPCs  
-Machine-readable: [sql-rpc-vuln-hunt-2026-08-23-findings.json](./sql-rpc-vuln-hunt-2026-08-23-findings.json)
+Machine-readable: [sql-rpc-vuln-hunt-2026-08-23-findings.json](./sql-rpc-vuln-hunt-2026-08-23-findings.json)  
+Independent re-verification: [sql-rpc-candidate-verification-2026-08-23.md](./sql-rpc-candidate-verification-2026-08-23.md) (all 10 confirmed; #10 wording corrected).
 
 ## Summary
 
@@ -23,7 +24,7 @@ Machine-readable: [sql-rpc-vuln-hunt-2026-08-23-findings.json](./sql-rpc-vuln-hu
 7. **portal_branding** — FOR ALL `auth.uid() IS NOT NULL`; cross-tenant branding takeover.
 8. **llm_prompt_templates** — any-auth UPDATE poisons extraction prompts.
 9. **get_collection_status_summary** — DEFINER, no auth; collection progress by workspace UUID.
-10. **reprocessing_queue** — FOR ALL `USING(true)`; read/rewrite reprocessing jobs.
+10. **reprocessing_queue** — SELECT `USING(TRUE)` + any-auth INSERT/UPDATE after `00005` DROP CASCADE of the earlier `authenticated_access` ALL policy; read/rewrite reprocessing jobs.
 
 ## Rejected (sampled)
 

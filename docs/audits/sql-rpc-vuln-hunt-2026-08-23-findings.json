@@ -186,10 +186,10 @@
     },
     {
       "severity": "high",
-      "location": "supabase/migrations/20251221000003_acord_intake_automation_complete.sql",
-      "title": "reprocessing_queue FOR ALL USING(true) lets any authenticated user read and rewrite extraction reprocessing jobs",
-      "description": "authenticated_access on reprocessing_queue is FOR ALL TO authenticated USING (true). Later prompt-versioning migration added additional SELECT TRUE / INSERT/UPDATE auth.uid() policies that OR with this ALL policy. Table not in batch5a2. Holds extraction_id and reprocessing settings.",
-      "impact": "Portal users can list every reprocessing job and force/cancel/repioritize reprocessing across tenants (integrity and processing-cost abuse).",
+      "location": "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql",
+      "title": "reprocessing_queue SELECT USING(TRUE) plus any-auth INSERT/UPDATE lets any login read and rewrite extraction reprocessing jobs",
+      "description": "On ordered migration replay, 20251221000003 created reprocessing_queue without a priority column and with authenticated_access FOR ALL USING(true). 20251221000005 then DROP TABLE CASCADE (missing priority) and recreates the table with reprocessing_select USING (TRUE), reprocessing_insert WITH CHECK (auth.uid() IS NOT NULL), and reprocessing_update USING (auth.uid() IS NOT NULL). The original authenticated_access policy does not survive replay; the surviving hole is still any-authenticated full read plus insert/update. Table not locked by batch5a2 or later tenancy hardening. Holds extraction_id, settings, and status.",
+      "impact": "Portal users can list every reprocessing job and force/cancel/reprioritize reprocessing across tenants (integrity and processing-cost abuse).",
       "verified": true,
       "status": "active",
       "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
@@ -198,11 +198,15 @@
       "reported_link": "",
       "attack_path": "1. Authenticate with any JWT.\n2. GET /rest/v1/reprocessing_queue?select=*\n3. PATCH status/priority or INSERT forged jobs.",
       "evidence": [
-        "supabase/migrations/20251221000003_acord_intake_automation_complete.sql:862",
-        "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql:506-513"
+        "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql:13-17",
+        "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql:243-290",
+        "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql:506-513",
+        "supabase/migrations/20251221000003_acord_intake_automation_complete.sql:693-729"
       ],
-      "remediation": "DROP authenticated_access and the sibling open policies. Scope to service_role writers and staff SELECT with workspace bind.",
-      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+      "remediation": "DROP reprocessing_select/insert/update open policies. Scope to service_role writers and staff SELECT with workspace bind via document_extractions.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production.",
+      "why_not_duplicate": "Distinct from already-reported llm_invocations/artifacts and field_output_history; this is the reprocessing job queue control plane.",
+      "verification_note": "Independent re-verify 2026-08-23: CONFIRMED. Candidate wording FOR ALL USING(true) corrected to final-state SELECT TRUE + any-auth write after DROP CASCADE."
     }
   ],
   "rejected_candidates": [
