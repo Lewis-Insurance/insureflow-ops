@@ -267,6 +267,7 @@ export function useLeadConversion() {
           status: 'won',
           converted_at: new Date().toISOString(),
           converted_account_id: accountId,
+          account_id: accountId,
           won_premium: policyData.premium,
         })
         .eq('id', leadId);

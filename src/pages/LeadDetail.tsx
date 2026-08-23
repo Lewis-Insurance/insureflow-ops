@@ -65,6 +65,9 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { ConvertLeadModal } from "@/components/leads/ConvertLeadModal";
+import { LeadDocumentCollectionLinkCard } from "@/components/documents/LeadDocumentCollectionLinkCard";
+import { useEnsureLeadProspectAccount } from "@/hooks/useEnsureLeadProspectAccount";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const INSURANCE_TYPES = [
@@ -132,12 +135,14 @@ export default function LeadDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
+  const [addQuoteAccountId, setAddQuoteAccountId] = useState<string | null>(null);
   const [convertModalOpen, setConvertModalOpen] = useState(false);
   const [tab, setTab] = useState('details');
 
   const { data: lead, isLoading } = useLead(leadId || undefined);
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
+  const ensureProspectAccount = useEnsureLeadProspectAccount();
 
   // Get Canopy pull data for this lead
   const { data: canopyPull } = useQuery({
@@ -255,6 +260,25 @@ export default function LeadDetail() {
   const updateStatus = (next: string) => {
     if (!leadId) return;
     updateLead.mutate({ id: leadId, status: next });
+  };
+
+  const handleAddQuote = async () => {
+    if (!leadId || !lead) return;
+
+    const existingAccountId = lead.account_id ?? lead.converted_account_id ?? null;
+    if (existingAccountId) {
+      setAddQuoteAccountId(existingAccountId);
+      setAddQuoteOpen(true);
+      return;
+    }
+
+    try {
+      const accountId = await ensureProspectAccount.mutateAsync(leadId);
+      setAddQuoteAccountId(accountId);
+      setAddQuoteOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to prepare prospect account.');
+    }
   };
 
   if (isLoading) {
@@ -394,7 +418,7 @@ export default function LeadDetail() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onSelect={() => setAddQuoteOpen(true)}>
+                      <DropdownMenuItem onSelect={handleAddQuote}>
                         <FileText className="mr-2 h-4 w-4" /> Add quote
                       </DropdownMenuItem>
                       <div className="px-1 py-1">
@@ -537,11 +561,12 @@ export default function LeadDetail() {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => setAddQuoteOpen(true)}
+                onClick={handleAddQuote}
+                disabled={ensureProspectAccount.isPending}
                 className="w-full justify-start gap-2 rounded-cc-md text-cc-text-secondary hover:text-cc-text-primary"
               >
                 <FileText className="h-4 w-4" />
-                Add quote
+                {ensureProspectAccount.isPending ? 'Preparing account' : 'Add quote'}
               </Button>
               {lead.email && (
                 <Button
@@ -556,6 +581,13 @@ export default function LeadDetail() {
                 </Button>
               )}
             </div>
+
+            <LeadDocumentCollectionLinkCard
+              leadId={leadId!}
+              leadEmail={lead.email}
+              leadName={displayName.fullName}
+              accountId={lead.account_id ?? lead.converted_account_id}
+            />
 
             <div className="space-y-2 rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
               <SectionLabel>Lead detail</SectionLabel>
@@ -917,12 +949,11 @@ export default function LeadDetail() {
       </AlertDialog>
 
       {/* Add Quote Modal */}
-      {lead && (
+      {lead && addQuoteAccountId && (
         <AddQuoteModal
           open={addQuoteOpen}
           onOpenChange={setAddQuoteOpen}
-          accountId={lead.account_id || leadId || ''}
-          accountName={displayName.fullName}
+          accountId={addQuoteAccountId}
         />
       )}
 

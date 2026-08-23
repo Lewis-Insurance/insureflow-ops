@@ -35,6 +35,7 @@ import { CancellationHolderList } from '@/components/certificates/CancellationHo
 import { useCancellationHolders } from '@/hooks/useCancellationHolders';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { PolicyCoveragePanel } from '@/components/policies/PolicyCoveragePanel';
+import { DocumentCollectionLinkCard } from '@/components/documents/DocumentCollectionLinkCard';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -544,6 +545,14 @@ export default function PolicyDetail() {
             )}
             </CardContent>
           </Card>
+
+        {policy.account?.id && (
+          <DocumentCollectionLinkCard
+            accountId={policy.account.id}
+            accountEmail={policy.account.email}
+            accountName={policy.account.name}
+          />
+        )}
 
         {/* Bound terms check (closing rigor): renders only when this policy
             has a 'bound' submission event; diffs what was bound against the

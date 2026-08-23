@@ -6,6 +6,7 @@ import { QuoteFollowUpTimeline } from "@/components/quotes/QuoteFollowUpTimeline
 import { FollowUpStatsCard } from "@/components/quotes/FollowUpStatsCard";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { AccentSpine, StatusPill, SectionLabel } from "@/components/cc";
+import { DocumentCollectionLinkCard } from "@/components/documents/DocumentCollectionLinkCard";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, cn } from "@/lib/utils";
@@ -230,6 +231,10 @@ export default function QuoteDetail() {
               ))}
             </div>
           </section>
+        )}
+
+        {quote.account_id && (
+          <DocumentCollectionLinkCard accountId={quote.account_id} />
         )}
 
         {/* Follow-up timeline + stats */}
