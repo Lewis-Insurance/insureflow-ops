@@ -13,6 +13,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 import { runPhase0DocumentExtract } from '../_shared/phase0Extract.ts';
+import { ensureExtractWritebackProposals } from '../_shared/extractWritebackProposal.ts';
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
@@ -714,7 +715,8 @@ async function portalUpload(
     action: 'document_uploaded',
     actor_type: 'client',
     actor_ip: clientIp,
-    new_value: { filename, file_size_bytes: fileSizeBytes },
+    // token_id rides in jsonb so get_my_collect_confirm_waiting can find the minting producer.
+    new_value: { filename, file_size_bytes: fileSizeBytes, token_id: tokenValidation.token_id ?? null },
   });
 
   return {
@@ -789,6 +791,27 @@ async function triggerCollectionExtract(
       accountId,
       createdBy,
     });
+
+    // Pending write-back proposals for the producer to confirm. Upsert-ignore only:
+    // never supersede, never apply. A failure here must not fail the upload.
+    try {
+      const ensured = await ensureExtractWritebackProposals(supabase, {
+        analysisId: result.analysisId,
+        accountId,
+        snapshot: result.analysisResult,
+        createdBy,
+      });
+      console.log('[document-collection] Proposals ensured', {
+        analysisId: result.analysisId,
+        rowCount: ensured.rowCount,
+        skipped: ensured.skipped,
+      });
+    } catch (proposalError: unknown) {
+      console.error('[document-collection] Proposal ensure failed', {
+        analysisId: result.analysisId,
+        error: proposalError instanceof Error ? proposalError.message : String(proposalError),
+      });
+    }
 
     await supabase
       .from('collection_uploads')

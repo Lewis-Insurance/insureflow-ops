@@ -11,6 +11,7 @@ import { usePolicySearch } from '@/hooks/usePolicySearch';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import { BookOfBusinessTab } from '@/components/dashboard/BookOfBusinessTab';
+import { CollectConfirmWaitingCard } from '@/components/dashboard/CollectConfirmWaitingCard';
 import {
   TriageTile,
   StatusPill,
@@ -296,7 +297,11 @@ export default function ProducerDashboard() {
   // The single obvious next action is to work the renewals that are due. The
   // header carries the one lime primary ONLY when there is something to work;
   // a dashboard with an empty queue shows zero lime (constitution rule 9).
+  // When "Portal came back" has rows, its Confirm button owns the lime and the
+  // header button drops to outline. One lime per surface, always.
+  const [confirmWaiting, setConfirmWaiting] = useState(false);
   const hasNextAction = counts.renewals_due > 0;
+  const headerIsPrimary = hasNextAction && !confirmWaiting;
 
   return (
     <AppLayout>
@@ -314,7 +319,8 @@ export default function ProducerDashboard() {
           </div>
           {hasNextAction && (
             <Button
-              data-primary
+              {...(headerIsPrimary ? { 'data-primary': true } : {})}
+              variant={headerIsPrimary ? 'default' : 'outline'}
               onClick={() => navigate('/policies?cohort=expiring_30d')}
               className="gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
             >
@@ -372,6 +378,9 @@ export default function ProducerDashboard() {
             onClick={() => navigate('/customers')}
           />
         </div>
+
+        {/* Portal came back: extracted client uploads waiting on this producer's confirm */}
+        <CollectConfirmWaitingCard onHasRows={setConfirmWaiting} />
 
         <section aria-label="Book of business">
           <BookOfBusinessTab />

@@ -585,4 +585,49 @@ describe('useExtractWritebackProposals', () => {
     expect(applyRpcCalls).toEqual([]);
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  it('confirm and reject invalidate the my-collect-confirm-waiting query', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+
+    pendingRows = [
+      { id: 'proposal-1', carrier_name: 'Hartford', status: 'pending', proposed_quote: {} },
+      { id: 'proposal-2', carrier_name: 'Travelers', status: 'pending', proposed_quote: {} },
+    ];
+
+    const { result } = renderHook(
+      () =>
+        useExtractWritebackProposals({
+          analysisId: 'analysis-1',
+          accountId: 'acct-1',
+          snapshot: SNAPSHOT,
+          lineCategory: 'commercial',
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(2);
+    });
+
+    invalidate.mockClear();
+    await act(async () => {
+      result.current.rejectProposal('proposal-1');
+    });
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['my-collect-confirm-waiting'] });
+    });
+
+    invalidate.mockClear();
+    await act(async () => {
+      result.current.confirmProposal('proposal-2');
+    });
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['my-collect-confirm-waiting'] });
+    });
+  });
 });
