@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -32,10 +32,11 @@ import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
 import { AORenewalDocuments } from '@/components/renewals/AORenewalDocuments';
-import { AoRenewalExtractSignalLink } from '@/components/renewals/AoRenewalExtractSignalLink';
+import { AoRenewalEvidenceRail } from '@/components/renewals/AoRenewalEvidenceRail';
 import { AORenewalEditorContext, type AORenewalDirtyRegistration } from '@/components/renewals/aoRenewalEditor';
 import { useNavigationGuard } from '@/contexts/NavigationGuardContext';
 import { useAoRenewalThisTermExtractSignals } from '@/hooks/useAoRenewalThisTermExtractSignals';
+import { useAoRenewalEvidence } from '@/hooks/useAoRenewalEvidence';
 import {
   addDaysLocalDate,
   differenceFromTodayInLocalDays,
@@ -98,8 +99,24 @@ export default function AORenewalEdit() {
   const { toast } = useToast();
 
   const { data: renewal, isLoading } = useAORenewal(id);
-  const { data: extractSignals } = useAoRenewalThisTermExtractSignals(renewal ? [renewal] : []);
-  const extractSignal = renewal ? extractSignals?.get(renewal.id) : undefined;
+  const {
+    data: extractSignals,
+    isLoading: isExtractLoading,
+    isError: isExtractError,
+  } = useAoRenewalThisTermExtractSignals(renewal ? [renewal] : []);
+  const { data: renewalEvidence, isLoading: isEvidenceLoading, isError: isEvidenceError } = useAoRenewalEvidence(renewal ? [renewal] : [], extractSignals);
+  const evidence = renewal ? renewalEvidence?.get(renewal.id) : undefined;
+  const contactLogRef = useRef<HTMLDivElement>(null);
+  const openContactLog = useCallback(() => {
+    setPanelPrefs((current) => ({ ...current, workspace: true }));
+    setWorkspaceTab('contact');
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        contactLogRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('contact_notes')?.focus({ preventScroll: true });
+      });
+    });
+  }, []);
   const updateMutation = useUpdateAORenewal();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const followUpMutation = useSetAORenewalFollowUp();
@@ -122,6 +139,7 @@ export default function AORenewalEdit() {
   const { profiles } = useProfiles();
 
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState('contact');
   const [showMovedModal, setShowMovedModal] = useState(false);
   const [showTerminalModal, setShowTerminalModal] = useState(false);
   const [pendingTerminalStatus, setPendingTerminalStatus] = useState<'lost' | 'cancelled' | null>(null);
@@ -153,6 +171,19 @@ export default function AORenewalEdit() {
       window.localStorage.setItem(PANEL_PREFS_KEY, JSON.stringify(panelPrefs));
     }
   }, [panelPrefs]);
+
+  useEffect(() => {
+    const targetsContactLog = () =>
+      window.location.hash === '#contact-log' ||
+      new URLSearchParams(window.location.search).get('section') === 'contact-log';
+    const revealContactLog = () => {
+      if (!isLoading && renewal && targetsContactLog()) openContactLog();
+    };
+
+    revealContactLog();
+    window.addEventListener('hashchange', revealContactLog);
+    return () => window.removeEventListener('hashchange', revealContactLog);
+  }, [isLoading, openContactLog, renewal]);
 
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -637,7 +668,12 @@ export default function AORenewalEdit() {
                       {formData.policy_type || 'Policy type not set'}
                     </Badge>
                   </div>
-                  <AoRenewalExtractSignalLink signal={extractSignal} />
+                  <AoRenewalEvidenceRail
+                    evidence={evidence}
+                    isLoading={isExtractLoading || isEvidenceLoading}
+                    isError={isExtractError || isEvidenceError}
+                    onLogContact={openContactLog}
+                  />
                 </div>
 
                 <div className="flex w-full flex-col gap-3 xl:max-w-sm">
@@ -980,7 +1016,7 @@ export default function AORenewalEdit() {
                   </CardHeader>
                   {panelPrefs.workspace && (
                     <CardContent>
-                      <Tabs defaultValue="contact" className="w-full">
+                      <Tabs value={workspaceTab} onValueChange={setWorkspaceTab} className="w-full">
                         <TabsList className="h-11 rounded-2xl bg-cc-surface-raised p-1 text-cc-text-muted">
                           <TabsTrigger value="contact" className="rounded-xl px-4 data-[state=active]:bg-cc-accent data-[state=active]:text-cc-on-accent">
                             Contact
@@ -992,7 +1028,7 @@ export default function AORenewalEdit() {
                             Notes
                           </TabsTrigger>
                         </TabsList>
-                        <TabsContent value="contact" className="mt-6">
+                        <TabsContent id="contact-log" ref={contactLogRef} value="contact" className="mt-6 scroll-mt-6">
                           <AORenewalContactLog renewalId={renewal.id} renewal={renewal} />
                         </TabsContent>
                         <TabsContent value="documents" className="mt-6">

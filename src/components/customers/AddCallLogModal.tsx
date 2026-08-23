@@ -87,6 +87,7 @@ export function AddCallLogModal({ open, onOpenChange, accountId, defaultPhone, d
       // re-log it, creating duplicate communications.
       queryClient.invalidateQueries({ queryKey: ['communication-history', accountId] });
       queryClient.invalidateQueries({ queryKey: ['communication-engagement-stats', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['ao-renewal-evidence'] });
 
       toast({
         title: 'Success',
