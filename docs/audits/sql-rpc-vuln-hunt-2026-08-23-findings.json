@@ -1,0 +1,253 @@
+{
+  "scan": "sql-rpc-migrations-hunt",
+  "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+  "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+  "detected_at_pst": "2026-08-23T02:24:00-07:00",
+  "findings": [
+    {
+      "severity": "critical",
+      "location": "supabase/migrations/20251218204626_acord_form_automation_suite.sql",
+      "title": "enrichment_cache FOR ALL auth.uid() IS NOT NULL dumps and mutates VIN/property/business enrichment across tenants",
+      "description": "Policy enrichment_cache_all is FOR ALL with USING (auth.uid() IS NOT NULL) and no TO clause (PUBLIC). Table stores lookup_key, lookup_type, and data JSONB for property/business/VIN enrichment with a 90-day TTL. Not included in batch5a1/5a2/6b lockdowns. No later migration drops or scopes this policy. GRANT ALL ON ALL TABLES TO authenticated applies.",
+      "impact": "Any authenticated principal (including a customer portal user) can read every enrichment cache entry project-wide (addresses, business profiles, VINs and related third-party payloads) and overwrite or delete cache rows.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any user JWT (portal signup is enough).\n2. GET /rest/v1/enrichment_cache?select=id,lookup_key,lookup_type,data,source,fetched_at\n3. RLS FOR ALL allows every row because auth.uid() is not null.\n4. Optional: PATCH/DELETE rows to poison or erase enrichment results.",
+      "evidence": [
+        "supabase/migrations/20251218204626_acord_form_automation_suite.sql:166-176",
+        "supabase/migrations/20251218204626_acord_form_automation_suite.sql:408-411",
+        "supabase/migrations/20251228700000_payment_tracking_module.sql:772-775"
+      ],
+      "remediation": "DROP enrichment_cache_all. Scope SELECT/writes to is_staff() plus workspace membership, or restrict all access to service_role only (edge enrichment writers).",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql",
+      "title": "field_output_history SELECT USING(TRUE) dumps extracted insurance field values to every authenticated user",
+      "description": "field_history_select is FOR SELECT TO authenticated USING (TRUE). Columns include raw_value, normalized_value, field_name, evidence_ids, and extraction_id. Sibling of already-reported llm_invocations/llm_artifacts but a distinct table holding the actual extracted field values. No later migration drops or scopes this SELECT. INSERT is also open to any logged-in user (auth.uid() IS NOT NULL).",
+      "impact": "Cross-tenant dump of OCR/LLM-extracted insurance fields (named insured, VINs, limits, FEIN-bearing text, driver data) to any portal or staff user.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. GET /rest/v1/field_output_history?select=id,extraction_id,field_name,raw_value,normalized_value,confidence_raw,evidence_ids,is_current\n3. All rows return via USING(TRUE).",
+      "evidence": [
+        "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql:300-328",
+        "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql:515-520"
+      ],
+      "remediation": "Replace SELECT with staff plus workspace scope via document_extractions → account join. Restrict INSERT to service_role.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/migrations/20251221000006_extraction_enhancements.sql",
+      "title": "extraction_review_queue SELECT USING(TRUE) plus any-auth UPDATE exposes and mutates full review queue_data JSON",
+      "description": "review_queue_select is TO authenticated USING (TRUE). queue_data JSONB holds the full ReviewQueue (questions, candidate values, conflicts). review_queue_update is USING (auth.uid() IS NOT NULL) with no staff/workspace bind. Sibling review_responses_select is also USING (TRUE) for original_value/corrected_value. Never locked by batch5a2 (table not in the rewrite list) or later tenancy hardening.",
+      "impact": "Any authenticated user can read every extraction review queue (insurance field candidates and conflicts) across tenants and overwrite status/assignment/queue_data.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. GET /rest/v1/extraction_review_queue?select=id,extraction_id,queue_data,status,required_missing\n3. GET /rest/v1/review_responses?select=field_name,original_value,corrected_value\n4. Optional: PATCH extraction_review_queue to alter status or queue_data.",
+      "evidence": [
+        "supabase/migrations/20251221000006_extraction_enhancements.sql:97-126",
+        "supabase/migrations/20251221000006_extraction_enhancements.sql:444-457"
+      ],
+      "remediation": "DROP the USING(TRUE)/auth.uid()-only policies. Scope SELECT/UPDATE to is_staff() and workspace membership via the parent extraction account.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/migrations/20251222160000_explore_document_minimal_delta.sql",
+      "title": "document_evidence_items Staff policies are only auth.uid() IS NOT NULL; any login dumps OCR evidence snippets",
+      "description": "Policies named Staff can view/insert evidence items use USING/WITH CHECK (auth.uid() IS NOT NULL) with no is_staff or workspace predicate. GRANT SELECT, INSERT TO authenticated. get_evidence_item is SECURITY DEFINER with no auth guard and GRANT EXECUTE TO authenticated, so even a future table lockdown would still be bypassable via RPC.",
+      "impact": "Any authenticated user can list OCR evidence snippets (snippet_text, bbox, labels) for every extraction across tenants.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. GET /rest/v1/document_evidence_items?select=extraction_id,evidence_id,page_index,snippet_text,label,confidence\n3. Or POST /rest/v1/rpc/get_evidence_item with extraction_id and evidence_id.",
+      "evidence": [
+        "supabase/migrations/20251222160000_explore_document_minimal_delta.sql:109-115",
+        "supabase/migrations/20251222160000_explore_document_minimal_delta.sql:166-194",
+        "supabase/migrations/20251222160000_explore_document_minimal_delta.sql:200-202"
+      ],
+      "remediation": "Replace Staff policies with is_staff() and workspace scope via extraction→account. Gate get_evidence_item the same way, or convert to SECURITY INVOKER after fixing table RLS.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20260702172000_master_coi_rpcs.sql",
+      "title": "coi_build_line SECURITY DEFINER has no auth guard and returns full COI line JSON for any policy_id",
+      "description": "coi_build_line is SECURITY DEFINER, loads policies by caller-supplied p_policy_id, and returns limits, AI rows, and provenanced cells. Unlike get_master_coi / save_master_coi_fields in the same migration (which call is_staff()), coi_build_line has no is_staff or is_agency_member check. GRANT EXECUTE TO authenticated.",
+      "impact": "Any authenticated user who obtains a policy UUID can exfiltrate commercial COI line details (limits, named insured cells, additional insureds) across tenants. Policy UUIDs are enumerable via already-reported listing holes.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. Obtain a policies.id (UI leak or prior listing hole).\n3. POST /rest/v1/rpc/coi_build_line with {\"p_policy_id\":\"<uuid>\",\"p_line\":\"gl\"} (also auto/umbrella/wc/property).\n4. DEFINER returns the assembled COI line JSON.",
+      "evidence": [
+        "supabase/migrations/20260702172000_master_coi_rpcs.sql:747-771",
+        "supabase/migrations/20260702172000_master_coi_rpcs.sql:984-985",
+        "supabase/migrations/20260702172000_master_coi_rpcs.sql:1074-1076"
+      ],
+      "remediation": "Add is_staff() and is_agency_member on the policy account workspace before selecting, matching get_master_coi. Or revoke EXECUTE from authenticated and keep as an internal helper only.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20260410000012_sync_renewals_from_policies.sql",
+      "title": "sync_renewals_from_policies SECURITY DEFINER creates renewals across all tenants with no auth guard",
+      "description": "Function is SECURITY DEFINER, loops all upcoming policies, and INSERTs renewals with no is_staff check. GRANT EXECUTE TO authenticated. Distinct from sync_policies_to_renewals which was staff-gated in 20260702090000. No later CREATE OR REPLACE adds a guard.",
+      "impact": "Any authenticated user can mass-create renewal rows for every agency book, corrupting renewal pipelines and ops dashboards.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. POST /rest/v1/rpc/sync_renewals_from_policies with {\"p_days_ahead\":365}.\n3. DEFINER inserts renewals for matching policies project-wide.",
+      "evidence": [
+        "supabase/migrations/20260410000012_sync_renewals_from_policies.sql:4-91"
+      ],
+      "remediation": "Require service_role or is_staff() plus workspace filter. Prefer retiring this RPC in favor of the hardened sync_policies_to_renewals path.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20251222240000_document_collection_portal_security.sql",
+      "title": "portal_branding FOR ALL auth.uid() IS NOT NULL lets any login overwrite agency portal branding",
+      "description": "authenticated_manage_portal_branding grants FOR ALL with only auth.uid() IS NOT NULL. Columns include agency_name, logo_url, primary_color, contact_phone, contact_email, footer_text, and account_id. GRANT ALL TO authenticated. No later migration scopes this table.",
+      "impact": "Any authenticated user can replace another agency's portal branding (logo, contact channels, colors), enabling phishing and trust abuse on document-collection / portal surfaces.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. GET /rest/v1/portal_branding?select=*\n3. PATCH a victim row setting logo_url and contact_email to attacker-controlled values.\n4. Clients hitting the branded portal see attacker branding.",
+      "evidence": [
+        "supabase/migrations/20251222240000_document_collection_portal_security.sql:324-351"
+      ],
+      "remediation": "Scope FOR ALL to is_staff() and is_agency_member on the branding account workspace. Restrict public reads to safe columns if needed.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql",
+      "title": "llm_prompt_templates UPDATE via auth.uid() IS NOT NULL lets any login poison extraction prompts",
+      "description": "templates_update is TO authenticated USING (auth.uid() IS NOT NULL). templates_select is USING (TRUE). Prompt bodies drive document extraction LLM calls. Distinct from already-reported llm_invocations/llm_artifacts SELECT dumps: this is integrity compromise of the template store itself. No later lockdown.",
+      "impact": "Any authenticated user can overwrite system/user prompt templates used for OCR extraction, causing incorrect underwriting data writes or prompt-injection into the extraction pipeline.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. GET /rest/v1/llm_prompt_templates?select=id,template_name,version,is_active\n3. PATCH a default template's prompt body.\n4. Subsequent extractions use the poisoned template.",
+      "evidence": [
+        "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql:475-482"
+      ],
+      "remediation": "Restrict SELECT to is_staff(); restrict INSERT/UPDATE to service_role or admin-only. Version templates immutably.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20251222220000_document_collection_module.sql",
+      "title": "get_collection_status_summary SECURITY DEFINER has no auth guard and returns collection progress for any workspace_id",
+      "description": "SECURITY DEFINER RPC takes arbitrary p_workspace_id and aggregates collection_requirements statuses with no is_staff, ownership, or token check. GRANT EXECUTE TO authenticated. Distinct from already-reported get_portal_packet_data (anon packet dump).",
+      "impact": "Any authenticated user can probe collection packet UUIDs for completion/rejection progress and required-document counts across tenants.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. Obtain a collection workspace UUID (URL leak or generate_collection_token path).\n3. POST /rest/v1/rpc/get_collection_status_summary with p_workspace_id.\n4. Receive progress JSON without proving packet ownership.",
+      "evidence": [
+        "supabase/migrations/20251222220000_document_collection_module.sql:417-448",
+        "supabase/migrations/20251222220000_document_collection_module.sql:570"
+      ],
+      "remediation": "Require is_staff() and ownership of the collection workspace, or a validated portal token. Revoke broad authenticated EXECUTE if only staff UI needs it.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20251221000003_acord_intake_automation_complete.sql",
+      "title": "reprocessing_queue FOR ALL USING(true) lets any authenticated user read and rewrite extraction reprocessing jobs",
+      "description": "authenticated_access on reprocessing_queue is FOR ALL TO authenticated USING (true). Later prompt-versioning migration added additional SELECT TRUE / INSERT/UPDATE auth.uid() policies that OR with this ALL policy. Table not in batch5a2. Holds extraction_id and reprocessing settings.",
+      "impact": "Portal users can list every reprocessing job and force/cancel/repioritize reprocessing across tenants (integrity and processing-cost abuse).",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:24:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. GET /rest/v1/reprocessing_queue?select=*\n3. PATCH status/priority or INSERT forged jobs.",
+      "evidence": [
+        "supabase/migrations/20251221000003_acord_intake_automation_complete.sql:862",
+        "supabase/migrations/20251221000005_prompt_versioning_and_llm_tracking.sql:506-513"
+      ],
+      "remediation": "DROP authenticated_access and the sibling open policies. Scope to service_role writers and staff SELECT with workspace bind.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    }
+  ],
+  "rejected_candidates": [
+    {
+      "item": "acord_templates authenticated_users_acord_templates USING(true)",
+      "reason": "batch5a2 rewrote ALL/true policies on acord_templates to is_staff(); comprehensive_rls had already wiped the earlier auth.uid() write policy."
+    },
+    {
+      "item": "acord_generation_jobs generation_jobs_all",
+      "reason": "Table dropped in 20260702160000_drop_acord_generation_jobs.sql."
+    },
+    {
+      "item": "rollback_import_batch unauth DEFINER",
+      "reason": "Already reported; fixed by 20260814180000_security_audit_rpc_hardening.sql (is_staff + workspace)."
+    },
+    {
+      "item": "customers_search_v1 / insureds_search_v1 anon GRANT",
+      "reason": "Latest bodies are INVOKER wrappers around unified_customer_search which is staff-gated in 20260702090000."
+    },
+    {
+      "item": "get_master_coi / save_master_coi_fields",
+      "reason": "Staff-gated in 20260702172000."
+    },
+    {
+      "item": "canopy_* / predictive analytics ALL USING(TRUE)",
+      "reason": "batch5a1 converted non-service ALL/true policies to is_staff(); remaining risk is global is_staff class (skipped per brief except unique cases)."
+    },
+    {
+      "item": "intake_submissions / rate_watch_* / llm_invocations / llm_artifacts / lead_commercial_insurance / bundle_snapshots / renewal_report_artifacts / get_ao_renewal_rate_watch_summary / get_pulls_without_monitoring / coi-certificates storage",
+      "reason": "Already reported in prior hunts (-3/-6 and older)."
+    },
+    {
+      "item": "document_chunks account_id IS NULL SELECT path",
+      "reason": "Conditional hole only for null account_id rows; severity depends on whether writers leave account_id null. Deferred pending data confirmation; search_document_chunks DEFINER still noted as related residual."
+    },
+    {
+      "item": "carrier_document_templates / template_field_zones auth.uid() ALL",
+      "reason": "Similar integrity class to llm_prompt_templates; lower sensitivity than enrichment/field history; omitted to avoid near-duplicate template-store findings in this batch."
+    }
+  ],
+  "checked_items": [
+    "July/August 202607*/202608* SECURITY DEFINER RPCs and RLS",
+    "batch5a1/5a2/6b DO-block rewrite simulation for surviving USING(true)/auth.uid() policies",
+    "Post-96fb32c migration delta (none)",
+    "Master COI, commercial bind, extract writeback, floor/hermes, certificates issuance RPCs",
+    "Prior memory findings -3/-6/-7 and base insureflow amalgam"
+  ]
+}
