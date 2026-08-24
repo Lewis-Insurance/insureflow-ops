@@ -82,6 +82,7 @@ describe('no AI-result direct client send paths', () => {
 
     expect(clientSendCallers).toEqual([
       'src/components/communications/SMSComposerModal.tsx',
+      'src/hooks/useClientEnglishPackSend.ts',
       'src/hooks/useSMSMessages.ts',
     ]);
 
@@ -90,5 +91,14 @@ describe('no AI-result direct client send paths', () => {
       expect(source).toContain('createClientSendApproval');
       expect(source).toContain('client_send_approval');
     }
+
+    const packSource = readFileSync(resolve(repoRoot, 'src/hooks/useClientEnglishPackSend.ts'), 'utf8');
+    const mintIndex = packSource.indexOf("createClientSendApproval('email-send', sendPayload)");
+    const publishIndex = packSource.indexOf("'publish_client_english_pack_document'");
+    const invokeIndex = packSource.indexOf("functions.invoke('email-send'");
+    expect(mintIndex).toBeGreaterThanOrEqual(0);
+    expect(publishIndex).toBeGreaterThan(mintIndex);
+    expect(invokeIndex).toBeGreaterThan(publishIndex);
+    expect(packSource).toContain('body: { ...sendPayload, client_send_approval }');
   });
 });

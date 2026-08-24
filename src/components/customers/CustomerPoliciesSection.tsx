@@ -22,6 +22,7 @@ import { UploadDocModal } from './UploadDocModal';
 import { EditPolicyModal } from './EditPolicyModal';
 import { useEffect, useState } from 'react';
 import { QuoteVsIncumbentComparison } from '@/components/quotes/QuoteVsIncumbentComparison';
+import { ClientEnglishPackDrawer } from '@/components/quotes/ClientEnglishPackDrawer';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -529,6 +530,12 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
                       >
                         Compare to incumbent
                       </Button>
+                      <ClientEnglishPackDrawer
+                        accountId={accountId}
+                        quoteId={quote.id}
+                        quoteLineOfBusiness={quote.line_of_business}
+                        carrierHint={quote.carrier_info?.name ?? quote.competitor_carrier}
+                      />
                     </div>
 
                     {expandedCompareQuoteId === quote.id ? (

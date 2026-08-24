@@ -45,6 +45,19 @@ interface SupabaseUpdateAttempt {
 const surfaceCases: SurfaceCase[] = [
   {
     surface: 'email-send',
+    payload: {
+      to: 'client@example.invalid',
+      subject: 'Your coverage summary from Lewis Insurance',
+      body: 'Hi Jamie, your coverage summary is ready. Sign in to your portal to view it: https://example.invalid/portal. Questions? Call us at (386) 755-0050. Document reference: abcdef012345.',
+    },
+    tamperedPayload: {
+      to: 'client@example.invalid',
+      subject: 'Your coverage summary from Lewis Insurance',
+      body: 'Hi Jamie, your coverage summary is ready. Sign in to your portal to view it: https://example.invalid/portal. Questions? Call us at (386) 755-0050. Document reference: 999999999999.',
+    },
+  },
+  {
+    surface: 'email-send',
     payload: { to: 'client@example.invalid', subject: 'Hello', body: 'Human text', ticketId: 'ticket-ref-001' },
     tamperedPayload: { to: 'client@example.invalid', subject: 'Hello', body: 'Changed human text', ticketId: 'ticket-ref-001' },
   },
@@ -294,9 +307,9 @@ describe('server-verified client send approval gate', () => {
 
   it('rejects expired approval references', async () => {
     const nowIso = '2026-06-30T12:00:00.000Z';
-    const payload = surfaceCases[1].payload;
+    const payload = surfaceCases[0].payload;
     const approval = await createPendingClientSendApproval({
-      surface: 'send-sms',
+      surface: 'email-send',
       payload,
       approvedByUserId: 'user-human-001',
       approvalRef: 'sendapproval_expired_ref_abcdefghijkl',
@@ -305,7 +318,7 @@ describe('server-verified client send approval gate', () => {
     const store = createInMemoryClientSendApprovalStore([approval]);
 
     const response = await clientSendApprovalGateResponse({
-      surface: 'send-sms',
+      surface: 'email-send',
       payload: payloadWithApproval(payload, approval),
       userId: 'user-human-001',
       approvalStore: store,
@@ -398,6 +411,18 @@ describe('server-verified client send approval gate', () => {
       expect(source, `${surface} must await the shared approval gate`).toContain('await clientSendApprovalGateResponse');
       expect(source, `${surface} must use the Supabase one-time approval store`).toContain('createSupabaseClientSendApprovalStore');
     }
+  });
+
+  it('classifies email provider outcomes without parsing an empty success body', () => {
+    const source = readFileSync(resolve(repoRoot, 'supabase/functions/email-send/index.ts'), 'utf8');
+    expect(source).toContain('const responseText = await response.text()');
+    expect(source).toContain("const deliveryOutcome = response.status >= 500 ? 'unknown' : 'not_sent'");
+    expect(source).toContain("delivery_outcome: 'sent'");
+    expect(source).toContain("response.status >= 500 ? 'unknown' : 'not_sent'");
+    expect(source).not.toContain('await response!.json()');
+    expect(source).toContain('TextBody: body');
+    expect(source).toContain("type: 'text/plain'");
+    expect(source).toContain('if (!providerAttempted)');
   });
 
   it('defers send-sms approval consumption until after non-side-effect validation, access, and rate checks', () => {
