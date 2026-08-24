@@ -72,6 +72,13 @@ describe('buildClientEnglishPack', () => {
     expect(JSON.stringify(first)).not.toContain('commission');
   });
 
+  it('renders policy term dates as readable calendar dates without DOB masking', () => {
+    const pack = buildClientEnglishPack(snapshot, undefined, meta);
+    expect(pack.effectiveDate).toBe('January 1, 2026');
+    expect(pack.expirationDate).toBe('January 1, 2027');
+    expect(`${pack.effectiveDate} ${pack.expirationDate}`).not.toMatch(/2026-01-01|2027-01-01|••|\?\?/);
+  });
+
   it('groups children beneath parents while preserving stable source order', () => {
     const coverages: ExtractSnapshotV1['coverages'] = [
       { name: 'Child B1', limit: null, deductible: null, premium: null, parent_coverage: 'Parent B' },
@@ -109,16 +116,41 @@ describe('buildClientEnglishPack', () => {
       ...snapshot,
       key_details: [
         'SSN 123-45-6789',
+        'SSN 123456789',
+        'Social Security number 123 45 6789',
         'Account number 123456789',
+        'Account: 123456789',
+        'Acct: 123456789',
+        'Agency account 123 456 789',
+        'Agency account ABC12345',
+        'Agency account number AB-123456',
         'VIN 1M8GDM9AXKP042788',
+        'Vehicle identifier 1M8GDM9AXKP042788',
         'DOB 1980-01-02',
+        'Date of birth 01/02/1980',
+        'Birth date 01-02-1980',
+        'DOB: January 2, 1980',
+        'Date of birth Jan 2 1980',
         'Driver license D1234567',
-        'DOB value without a label 1980-01-02',
-        'Sprinkler system inspected',
+        'DL A1234567',
+        'D.L. A1234567',
+        'Sprinkler inspection 2026-01-01 for account review',
+        'Account 2026-01-01',
+        'Account: 2026-01-01',
+        'Account review completed',
+        'License requirements reviewed',
+        'Reference ABCDEFGHJKLMNPRST',
       ],
     };
     const pack = buildClientEnglishPack(adversarial, undefined, meta);
-    expect(pack.keyDetails).toEqual(['Sprinkler system inspected']);
+    expect(pack.keyDetails).toEqual([
+      'Sprinkler inspection 2026-01-01 for account review',
+      'Account 2026-01-01',
+      'Account: 2026-01-01',
+      'Account review completed',
+      'License requirements reviewed',
+      'Reference ABCDEFGHJKLMNPRST',
+    ]);
     const output = JSON.stringify(pack);
     expect(output).not.toMatch(/\b\d{3}-\d{2}-\d{4}\b/);
     expect(output).not.toMatch(/1M8GDM9AXKP042788|D1234567|123456789/);
