@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { verifyAgencyAuth } from "../_shared/agency-auth.ts";
 import { canonicalizeRow, parseCsv, sha256Hex, sourceRowHash, validateRawRow, validateRow } from "../_shared/radarIngest.ts";
+import { recordSwoMiss, SWO_MISS_REASON } from "../_shared/radarSwoAlert.ts";
 
 const response = (body: unknown, status: number, headers: Record<string, string>) =>
   new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
@@ -31,19 +32,21 @@ serve(async (req) => {
       actor = auth.user.id;
     }
 
-    let query = db.from("radar_config").select("agency_workspace_id,swo_source_url").not("swo_source_url", "is", null);
+    // Include configs with a missing URL so a scheduled run cannot silently skip them.
+    let query = db.from("radar_config").select("agency_workspace_id,swo_source_url");
     if (requestedWorkspace) query = query.eq("agency_workspace_id", requestedWorkspace);
     const { data: configs, error: configError } = await query;
     if (configError) throw configError;
+    if (!configs?.length) return response({ error: "No radar_config targets found" }, 503, cors);
     const allowedHosts = new Set((Deno.env.get("RADAR_SWO_ALLOWED_HOSTS") ?? "").split(",").map((v) => v.trim()).filter(Boolean));
-    if (!allowedHosts.size) throw new Error("RADAR_SWO_ALLOWED_HOSTS is not configured");
+    const easternDate = easternCalendarDate(new Date());
     const results: unknown[] = [];
     for (const config of configs ?? []) {
       try {
+      if (!allowedHosts.size) throw new Error("RADAR_SWO_ALLOWED_HOSTS is not configured");
       const source = new URL(config.swo_source_url);
       if (source.protocol !== "https:" || !allowedHosts.has(source.hostname) || source.username || source.password || source.search || source.hash) {
-        results.push({ agencyWorkspaceId: config.agency_workspace_id, error: "SWO source host is not allowed" });
-        continue;
+        throw new Error(SWO_MISS_REASON.host);
       }
       const fetched = await fetch(source, {
         headers: Deno.env.get("RADAR_SWO_API_TOKEN") ? { Authorization: `Bearer ${Deno.env.get("RADAR_SWO_API_TOKEN")}` } : {},
@@ -51,12 +54,10 @@ serve(async (req) => {
         signal: AbortSignal.timeout(30_000),
       });
       if (fetched.status >= 300 && fetched.status < 400) {
-        results.push({ agencyWorkspaceId: config.agency_workspace_id, error: "SWO source redirects are prohibited" });
-        continue;
+        throw new Error("SWO source redirects are prohibited");
       }
       if (!fetched.ok) {
-        results.push({ agencyWorkspaceId: config.agency_workspace_id, error: `SWO source returned ${fetched.status}` });
-        continue;
+        throw new Error(SWO_MISS_REASON.fetch(fetched.status));
       }
       const declaredLength = Number(fetched.headers.get("content-length") ?? 0);
       if (declaredLength > 20_000_000) throw new Error("SWO response exceeds 20 MB");
@@ -65,15 +66,14 @@ serve(async (req) => {
       const { data: duplicate } = await db.from("poc_uploads").select("id,row_count")
         .eq("agency_workspace_id", config.agency_workspace_id).eq("sha256", hash).maybeSingle();
       if (duplicate) {
-        const processing = await processUpload(config.agency_workspace_id, duplicate.id);
-        results.push({ agencyWorkspaceId: config.agency_workspace_id, uploadId: duplicate.id, duplicate: true, processing });
-        continue;
+        throw new Error(duplicate.row_count === 0 ? SWO_MISS_REASON.emptyPayload : SWO_MISS_REASON.duplicate);
       }
       const content = new TextDecoder().decode(bytes);
       const contentType = fetched.headers.get("content-type") ?? "";
       const rawRows = contentType.includes("json")
         ? normalizeJsonRows(JSON.parse(content))
         : parseCsv(content);
+      if (rawRows.length === 0) throw new Error(SWO_MISS_REASON.emptyPayload);
       if (rawRows.length > 25_000) throw new Error("SWO response exceeds 25,000 rows");
       rawRows.forEach(validateRawRow);
       const filename = `swo-${new Date().toISOString().slice(0, 10)}.${contentType.includes("json") ? "json" : "csv"}`;
@@ -95,21 +95,39 @@ serve(async (req) => {
         onConflict: "agency_workspace_id,source_row_hash", ignoreDuplicates: true,
       });
       if (error) throw error;
+      const { count: stagedCount, error: stagedCountError } = await db.from("poc_staging").select("id", { count: "exact", head: true })
+        .eq("agency_workspace_id", config.agency_workspace_id).eq("poc_upload_id", upload.id);
+      if (stagedCountError) throw stagedCountError;
+      if (!stagedCount) throw new Error(SWO_MISS_REASON.noStaging);
       const processingBatches = await processUpload(config.agency_workspace_id, upload.id);
       results.push({ agencyWorkspaceId: config.agency_workspace_id, uploadId: upload.id, rowCount: staging.length,
         invalidRows: staging.filter((row) => row.parse_errors.length).length, processing: processingBatches });
       } catch (error) {
         console.error("radar-swo-pull workspace failed", config.agency_workspace_id, error);
+        const reason = error instanceof Error ? error.message : "Workspace SWO pull failed";
+        let alertCreated = false;
+        try {
+          await recordSwoMiss(db, config.agency_workspace_id, easternDate, reason);
+          alertCreated = true;
+        } catch (alertError) {
+          console.error("radar-swo-pull failed to record alert", config.agency_workspace_id, alertError);
+        }
         results.push({ agencyWorkspaceId: config.agency_workspace_id,
-          error: error instanceof Error ? error.message : "Workspace SWO pull failed" });
+          error: reason, alertCreated });
       }
     }
-    return response({ results }, 200, cors);
+    return response({ results }, results.some((result) => (result as { error?: unknown }).error) ? 207 : 200, cors);
   } catch (error) {
     console.error("radar-swo-pull", error);
     return response({ error: error instanceof Error ? error.message : "SWO pull failed" }, 500, cors);
   }
 });
+
+function easternCalendarDate(value: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(value);
+}
 
 async function processUpload(agencyWorkspaceId: string, uploadId: string): Promise<unknown[]> {
   const internalSecret = Deno.env.get("RADAR_INTERNAL_SECRET");
