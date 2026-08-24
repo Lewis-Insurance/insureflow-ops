@@ -31,6 +31,7 @@ export interface AoRenewalEvidenceQuoteRow {
 }
 
 export interface AoRenewalFallbackQuoteRow {
+  id: string;
   renewal_id: string;
   status: string;
 }
@@ -272,15 +273,22 @@ export function buildAoRenewalEvidence(
   const { renewal, documents, quotes, fallbackQuotes, rollup, extract, today } =
     input;
   const dec = deriveCurrentDecEvidence(renewal, documents, extract);
-  const openQuoteCount = renewal.account_id
+  const matchingAccountQuotes = renewal.account_id
     ? quotes.filter((quote) =>
         lobMatchesPolicyAndQuote(renewal.policy_type, quote.line_of_business),
-      ).length
-    : fallbackQuotes.filter(
-        (quote) =>
-          quote.renewal_id === renewal.id &&
-          (quote.status === "quoted" || quote.status === "selected"),
-      ).length;
+      )
+    : [];
+  const matchingAoQuotes = fallbackQuotes.filter(
+    (quote) =>
+      quote.renewal_id === renewal.id &&
+      (quote.status === "quoted" || quote.status === "selected"),
+  );
+  const openQuoteCount = renewal.account_id
+    ? new Set([
+        ...matchingAccountQuotes.map((quote) => quote.id),
+        ...matchingAoQuotes.map((quote) => quote.id),
+      ]).size
+    : matchingAoQuotes.length;
   const items = rollup?.has_packet && rollup.total_count > 0
     ? {
         missingCount: rollup.missing_count,

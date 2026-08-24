@@ -77,7 +77,7 @@ async function fetchFallbackQuotes(
   for (const ids of chunkAoRenewalEvidenceIds(renewalIds)) {
     const { data, error } = await supabase
       .from("ao_renewal_quotes")
-      .select("renewal_id, status")
+      .select("id, renewal_id, status")
       .in("renewal_id", ids)
       .in("status", ["quoted", "selected"]);
     if (error) throw error;
@@ -125,15 +125,12 @@ export function useAoRenewalEvidence(
             .filter((id): id is string => !!id),
         ),
       ];
-      const unlinkedRenewalIds = renewals
-        .filter((renewal) => !renewal.account_id)
-        .map((renewal) => renewal.id);
       const [accountEvidence, fallbackQuotes] = await Promise.all([
         accountIds.length
           ? fetchAccountEvidence(accountIds)
           : Promise.resolve({ documents: [], quotes: [], rollups: [] }),
-        unlinkedRenewalIds.length
-          ? fetchFallbackQuotes(unlinkedRenewalIds)
+        renewalIds.length
+          ? fetchFallbackQuotes(renewalIds)
           : Promise.resolve([]),
       ]);
       return { ...accountEvidence, fallbackQuotes, accountLinkSignature };

@@ -106,10 +106,22 @@ describe('quotes, items, and touches', () => {
     expect(buildAoRenewalEvidence({ renewal: { ...renewal, policy_type: 'home' }, documents: [], quotes, fallbackQuotes: [], rollup: null, today: '2026-06-01' }).openQuoteCount).toBe(1);
   });
 
-  it('uses AO quote fallback only for an unlinked renewal', () => {
-    const fallbackQuotes = [{ renewal_id: 'renewal-1', status: 'quoted' }, { renewal_id: 'renewal-1', status: 'selected' }];
+  it('counts AO quotes for both linked and unlinked renewals', () => {
+    const fallbackQuotes = [{ id: 'ao-1', renewal_id: 'renewal-1', status: 'quoted' }, { id: 'ao-2', renewal_id: 'renewal-1', status: 'selected' }];
     expect(buildAoRenewalEvidence({ renewal: { ...renewal, account_id: null }, documents: [], quotes: [], fallbackQuotes, rollup: null, today: '2026-06-01' }).openQuoteCount).toBe(2);
-    expect(buildAoRenewalEvidence({ renewal, documents: [], quotes: [], fallbackQuotes, rollup: null, today: '2026-06-01' }).openQuoteCount).toBe(0);
+    expect(buildAoRenewalEvidence({ renewal, documents: [], quotes: [], fallbackQuotes, rollup: null, today: '2026-06-01' }).openQuoteCount).toBe(2);
+  });
+
+  it('does not double-count the same linked quote from both sources', () => {
+    const quotes = [
+      { id: 'shared-quote', account_id: 'account-1', line_of_business: 'gl', premium: 1, created_at: null },
+      { id: 'wrong-lob', account_id: 'account-1', line_of_business: 'auto', premium: 1, created_at: null },
+    ];
+    const fallbackQuotes = [
+      { id: 'shared-quote', renewal_id: 'renewal-1', status: 'quoted' },
+      { id: 'ao-only', renewal_id: 'renewal-1', status: 'selected' },
+    ];
+    expect(buildAoRenewalEvidence({ renewal, documents: [], quotes, fallbackQuotes, rollup: null, today: '2026-06-01' }).openQuoteCount).toBe(2);
   });
 
   it('maps RPC item counts, including an expired requirement already bucketed as missing', () => {
