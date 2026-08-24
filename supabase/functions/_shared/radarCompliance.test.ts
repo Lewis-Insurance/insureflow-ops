@@ -2,6 +2,7 @@ import {
   isWithinRecipientHours,
   isWrittenMarketingPewc,
   isLeadContactBindingValid,
+  deriveFloridaRecipientTimezone,
   type RadarComplianceReceipt,
   type RadarQueueIdentity,
   validateRadarComplianceReceipt,
@@ -78,4 +79,13 @@ Deno.test('account-less Radar handoff accepts only a nullable contact', () => {
   if (!isLeadContactBindingValid(null, null)) throw new Error('account-less binding refused');
   if (isLeadContactBindingValid(null, 'account-1')) throw new Error('arbitrary account accepted');
   if (!isLeadContactBindingValid('account-1', 'account-1')) throw new Error('matching account refused');
+});
+
+Deno.test('recipient timezone comes from Florida source and county, not caller input', () => {
+  if (deriveFloridaRecipientTimezone('fl_dfs_swo', 'Escambia County') !== 'America/Chicago') {
+    throw new Error('Florida Central county mapped incorrectly');
+  }
+  if (deriveFloridaRecipientTimezone('untrusted', 'Escambia') !== null) {
+    throw new Error('untrusted source established timezone');
+  }
 });

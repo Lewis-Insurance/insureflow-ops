@@ -30,9 +30,14 @@ Deno.test("validation requires deterministic identity, never name alone", () => 
 });
 
 Deno.test("dedupe prefers normalized policy plus carrier", () => {
-  assertEquals(dedupKey({ employer_name: "ignored", policy_number: "WC-12", carrier: "A & B" }), "policy:wc12:ab");
+  assertEquals(dedupKey({ employer_name: "ignored", policy_number: "WC-12", carrier: "A & B", expiration_date: "2026-08-24" }), "policy:wc12:aandb:2026-08-24");
   assertEquals(dedupKey({ employer_name: "Acme, LLC", county: "Lee", expiration_date: "2026-09-01" }),
     "employer:acmellc:lee:2026-09-01");
+});
+
+Deno.test("invalid calendar dates become row parse errors", () => {
+  const row = canonicalizeRow({ Employer: "Acme", County: "Lee", "Expiration Date": "2026-02-30" });
+  assertEquals(validateRow(row), ["expiration_date is invalid"]);
 });
 
 Deno.test("source row hashes are deterministic and kind-sensitive", async () => {

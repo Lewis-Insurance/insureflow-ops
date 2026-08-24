@@ -4,6 +4,7 @@ import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 import {
   isWithinRecipientHours,
   isLeadContactBindingValid,
+  deriveFloridaRecipientTimezone,
   isWrittenMarketingPewc,
   normalizeDestination,
   normalizePhone,
@@ -18,7 +19,6 @@ interface GuardRequest {
   dnc_phone?: string;
   licensed_agent_id: string;
   license_number: string;
-  recipient_timezone: string;
 }
 
 interface DncResult {
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   }
 
   if (!body.opportunity_id || !body.licensed_agent_id || !body.license_number?.trim() ||
-      !body.destination || !body.recipient_timezone || !['email', 'sms'].includes(body.channel)) {
+      !body.destination || !['email', 'sms'].includes(body.channel)) {
     return json({ error: 'Missing required Guard fields' }, 400, corsHeaders);
   }
   if (auth.id !== body.licensed_agent_id) {
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
   const { data: opportunity, error: opportunityError } = await supabase
     .from('renewal_opportunities')
-    .select('id, agency_workspace_id, kind, stage, lead_id')
+    .select('id, agency_workspace_id, kind, stage, lead_id, source, county')
     .eq('id', body.opportunity_id)
     .maybeSingle();
   if (opportunityError || !opportunity || !['cancel', 'swo'].includes(opportunity.kind)) {
@@ -129,7 +129,9 @@ Deno.serve(async (req) => {
   }
   const now = new Date();
   const reasons: string[] = [];
-  const hoursOk = isWithinRecipientHours(now, body.recipient_timezone);
+  const recipientTimezone = deriveFloridaRecipientTimezone(opportunity.source, opportunity.county);
+  if (!recipientTimezone) reasons.push('recipient_timezone_unverifiable');
+  const hoursOk = recipientTimezone ? isWithinRecipientHours(now, recipientTimezone) : false;
   if (!hoursOk) reasons.push('outside_recipient_hours');
 
   const optedOut = await hasAllChannelOptOut(
@@ -186,7 +188,7 @@ Deno.serve(async (req) => {
       channel: body.channel,
       destination,
       dnc_phone: dncPhone,
-      recipient_timezone: body.recipient_timezone,
+      recipient_timezone: recipientTimezone || 'UNVERIFIED',
       licensed_agent_id: body.licensed_agent_id,
       license_number: body.license_number.trim(),
       pewc,

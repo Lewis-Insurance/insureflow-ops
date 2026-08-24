@@ -71,9 +71,11 @@ serve(async (req) => {
 
     const parsed = await Promise.all(rawRows.map(async (raw, index) => {
       const row = canonicalizeRow(raw);
+      const parseErrors = validateRow(row);
       return {
         agency_workspace_id: workspaceId, poc_upload_id: upload.id, row_number: index + 1, kind,
-        ...row, raw_row: raw, source_row_hash: await sourceRowHash(kind, row), parse_errors: validateRow(row),
+        ...row, expiration_date: parseErrors.includes("expiration_date is invalid") ? null : row.expiration_date,
+        raw_row: raw, source_row_hash: await sourceRowHash(kind, row), parse_errors: parseErrors,
       };
     }));
     const staging = [...new Map(parsed.map((row) => [row.source_row_hash, row])).values()];

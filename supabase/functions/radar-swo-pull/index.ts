@@ -39,6 +39,7 @@ serve(async (req) => {
     if (!allowedHosts.size) throw new Error("RADAR_SWO_ALLOWED_HOSTS is not configured");
     const results: unknown[] = [];
     for (const config of configs ?? []) {
+      try {
       const source = new URL(config.swo_source_url);
       if (source.protocol !== "https:" || !allowedHosts.has(source.hostname) || source.username || source.password || source.search || source.hash) {
         results.push({ agencyWorkspaceId: config.agency_workspace_id, error: "SWO source host is not allowed" });
@@ -83,9 +84,11 @@ serve(async (req) => {
       if (uploadError) throw uploadError;
       const parsed = await Promise.all(rawRows.map(async (raw, index) => {
         const row = canonicalizeRow(raw);
+        const parseErrors = validateRow(row);
         return { agency_workspace_id: config.agency_workspace_id, poc_upload_id: upload.id,
-          row_number: index + 1, kind: "swo", ...row, raw_row: raw,
-          source_row_hash: await sourceRowHash("swo", row), parse_errors: validateRow(row) };
+          row_number: index + 1, kind: "swo", ...row,
+          expiration_date: parseErrors.includes("expiration_date is invalid") ? null : row.expiration_date,
+          raw_row: raw, source_row_hash: await sourceRowHash("swo", row), parse_errors: parseErrors };
       }));
       const staging = [...new Map(parsed.map((row) => [row.source_row_hash, row])).values()];
       const { error } = await db.from("poc_staging").upsert(staging, {
@@ -95,6 +98,11 @@ serve(async (req) => {
       const processingBatches = await processUpload(config.agency_workspace_id, upload.id);
       results.push({ agencyWorkspaceId: config.agency_workspace_id, uploadId: upload.id, rowCount: staging.length,
         invalidRows: staging.filter((row) => row.parse_errors.length).length, processing: processingBatches });
+      } catch (error) {
+        console.error("radar-swo-pull workspace failed", config.agency_workspace_id, error);
+        results.push({ agencyWorkspaceId: config.agency_workspace_id,
+          error: error instanceof Error ? error.message : "Workspace SWO pull failed" });
+      }
     }
     return response({ results }, 200, cors);
   } catch (error) {

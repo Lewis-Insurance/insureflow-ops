@@ -59,6 +59,8 @@ export function validateRow(row: RadarRow): string[] {
   }
   if (row.expiration_date && !/^\d{4}-\d{2}-\d{2}$/.test(row.expiration_date)) {
     errors.push("expiration_date is invalid");
+  } else if (row.expiration_date && !isValidCalendarDate(row.expiration_date)) {
+    errors.push("expiration_date is invalid");
   }
   return errors;
 }
@@ -153,7 +155,7 @@ export function preflightXlsx(bytes: Uint8Array): void {
 export function dedupKey(row: RadarRow): string {
   const policy = normalizeEntity(row.policy_number);
   const carrier = normalizeEntity(row.carrier);
-  if (policy && carrier) return `policy:${policy}:${carrier}`;
+  if (policy && carrier) return `policy:${policy}:${carrier}:${row.expiration_date ?? "unknown-term"}`;
   return `employer:${normalizeEntity(row.employer_name)}:${normalizeEntity(row.county)}:${row.expiration_date ?? ""}`;
 }
 
@@ -170,4 +172,12 @@ function normalizeDate(value: unknown): string | undefined {
   const us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
   if (us) return `${us[3]}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
   return text;
+}
+
+function isValidCalendarDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }

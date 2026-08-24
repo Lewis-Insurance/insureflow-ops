@@ -50,4 +50,10 @@ describe('Radar queue provenance contract', () => {
     expect(guard).toContain('normalizePhone(lead.phone) !== dncPhone');
     expect(guard).toContain("(lead.email || '').trim().toLowerCase() !== destination");
   });
+
+  it('does not trust a caller-supplied recipient timezone', () => {
+    expect(guard).toContain('deriveFloridaRecipientTimezone(opportunity.source, opportunity.county)');
+    expect(guard).not.toContain('body.recipient_timezone');
+    expect(guard).toContain("recipient_timezone: recipientTimezone || 'UNVERIFIED'");
+  });
 });

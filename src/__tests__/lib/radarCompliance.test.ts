@@ -4,6 +4,7 @@ import {
   type RadarQueueIdentity,
   isWrittenMarketingPewc,
   isLeadContactBindingValid,
+  deriveFloridaRecipientTimezone,
   validateRadarComplianceReceipt,
 } from '../../../supabase/functions/_shared/radarCompliance';
 
@@ -78,5 +79,23 @@ describe('Radar handoff contact binding', () => {
     expect(isLeadContactBindingValid('account-1', null)).toBe(false);
     expect(isLeadContactBindingValid('account-1', 'account-1')).toBe(true);
     expect(isLeadContactBindingValid('account-1', 'account-2')).toBe(false);
+  });
+});
+
+describe('Radar recipient timezone authority', () => {
+  it('derives timezone from the Florida record source and county', () => {
+    expect(deriveFloridaRecipientTimezone('fl_poc_cancel', 'Miami-Dade')).toBe('America/New_York');
+    expect(deriveFloridaRecipientTimezone('fl_dfs_swo', 'Escambia County')).toBe('America/Chicago');
+  });
+
+  it('fails closed without an authoritative Florida source or county', () => {
+    expect(deriveFloridaRecipientTimezone('caller_claim', 'Escambia')).toBeNull();
+    expect(deriveFloridaRecipientTimezone('fl_poc_cancel', '')).toBeNull();
+  });
+
+  it('does not accept a caller timezone as an input to derivation', () => {
+    const maliciousCallerZone = 'Pacific/Honolulu';
+    expect(deriveFloridaRecipientTimezone('fl_poc_cancel', 'Escambia')).toBe('America/Chicago');
+    expect(deriveFloridaRecipientTimezone('fl_poc_cancel', maliciousCallerZone)).toBeNull();
   });
 });

@@ -55,6 +55,36 @@ export function isLeadContactBindingValid(
   return leadAccountId ? leadAccountId === requestedContactId : requestedContactId == null;
 }
 
+const FLORIDA_CENTRAL_TIME_COUNTIES = new Set([
+  'bay', 'calhoun', 'escambia', 'holmes', 'jackson',
+  'okaloosa', 'santa rosa', 'walton', 'washington',
+]);
+const FLORIDA_COUNTIES = new Set([
+  'alachua', 'baker', 'bay', 'bradford', 'brevard', 'broward', 'calhoun', 'charlotte',
+  'citrus', 'clay', 'collier', 'columbia', 'de soto', 'dixie', 'duval', 'escambia',
+  'flagler', 'franklin', 'gadsden', 'gilchrist', 'glades', 'gulf', 'hamilton', 'hardee',
+  'hendry', 'hernando', 'highlands', 'hillsborough', 'holmes', 'indian river', 'jackson',
+  'jefferson', 'lafayette', 'lake', 'lee', 'leon', 'levy', 'liberty', 'madison', 'manatee',
+  'marion', 'martin', 'miami-dade', 'monroe', 'nassau', 'okaloosa', 'okeechobee', 'orange',
+  'osceola', 'palm beach', 'pasco', 'pinellas', 'polk', 'putnam', 'santa rosa', 'sarasota',
+  'seminole', 'st. johns', 'st. lucie', 'sumter', 'suwannee', 'taylor', 'union', 'volusia',
+  'wakulla', 'walton', 'washington',
+]);
+
+export function deriveFloridaRecipientTimezone(
+  source: string | null | undefined,
+  county: string | null | undefined,
+): string | null {
+  if (!['fl_poc_cancel', 'fl_dfs_swo'].includes((source || '').trim().toLowerCase())) return null;
+  const normalizedCounty = (county || '').trim().toLowerCase().replace(/\s+county$/, '').trim();
+  if (!FLORIDA_COUNTIES.has(normalizedCounty)) return null;
+  // Gulf County straddles the Florida time-zone boundary; county alone is not authoritative.
+  if (normalizedCounty === 'gulf') return null;
+  return FLORIDA_CENTRAL_TIME_COUNTIES.has(normalizedCounty)
+    ? 'America/Chicago'
+    : 'America/New_York';
+}
+
 export interface ConsentLedgerEvidence {
   action?: string;
   phone?: string;

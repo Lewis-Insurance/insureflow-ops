@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { zipSync, strToU8 } from 'fflate';
-import { canonicalizeRow, normalizeEntity, preflightXlsx } from '../../../supabase/functions/_shared/radarIngest';
+import { canonicalizeRow, dedupKey, normalizeEntity, preflightXlsx, validateRow } from '../../../supabase/functions/_shared/radarIngest';
 
 const root = process.cwd();
 const migration = readFileSync(resolve(root, 'supabase/migrations/20260824110000_wc_renewal_radar_phase1.sql'), 'utf8');
@@ -53,5 +53,12 @@ describe('Radar Phase 1 contracts', () => {
     expect(() => preflightXlsx(multi)).toThrow(/exactly one/);
     expect(canonicalizeRow({ Employer: 'Acme', Policy: 'WC1', Carrier: 'C', 'Expiration Date': new Date('2026-08-24T12:00:00Z') }).expiration_date)
       .toBe('2026-08-24');
+  });
+
+  it('separates policy renewal terms and rejects impossible calendar dates', () => {
+    expect(dedupKey({ policy_number: 'WC-1', carrier: 'A&B', expiration_date: '2026-08-24' }))
+      .not.toBe(dedupKey({ policy_number: 'WC-1', carrier: 'A&B', expiration_date: '2027-08-24' }));
+    expect(validateRow(canonicalizeRow({ Employer: 'Acme', County: 'Lee', 'Expiration Date': '2026-02-30' })))
+      .toContain('expiration_date is invalid');
   });
 });

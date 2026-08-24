@@ -150,8 +150,10 @@ BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended(v.agency_workspace_id::text, 8142026));
   SELECT * INTO c FROM public.radar_config WHERE agency_workspace_id=v.agency_workspace_id;
   IF NOT FOUND OR cardinality(c.class_allowlist)=0 OR v.radar_score < c.score_threshold THEN RETURN false; END IF;
-  SELECT count(*) INTO used FROM public.renewal_opportunities
-    WHERE agency_workspace_id=v.agency_workspace_id AND stage='tasked' AND updated_at >= now()-interval '7 days';
+  SELECT count(*) INTO used FROM public.tasks t
+    JOIN public.renewal_opportunities ro ON ro.id=t.entity_id
+    WHERE ro.agency_workspace_id=v.agency_workspace_id AND t.source='wc_renewal_radar'
+      AND t.entity_type='renewal_opportunity' AND t.created_at >= now()-interval '7 days';
   IF used >= floor(c.producer_weekly_capacity*c.capacity_multiplier) THEN RETURN false; END IF;
   INSERT INTO public.tasks(title,description,category,source,entity_type,entity_id,related_lead_id,metadata,dedupe_key,priority,status,created_by)
   VALUES ((CASE WHEN v.kind='swo' THEN 'SWO' ELSE 'Cancellation' END)||' workers compensation advisory: '||v.employer_name,
