@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { isHandedOffRadarLead } from '../../../supabase/functions/_shared/radarLeadProvenance';
 
 const root = resolve(process.cwd());
 const migration = readFileSync(resolve(root, 'supabase/migrations/20260824110000_wc_renewal_radar_phase1.sql'), 'utf8');
@@ -39,9 +40,46 @@ describe('Radar queue provenance contract', () => {
     expect(supabaseConfig).toContain('[functions.radar-guarded-enqueue]\nverify_jwt = true');
   });
 
-  it('allows post-handoff Radar leads to enroll while guarding at enqueue', () => {
-    expect(nurture).not.toContain('filteredLeads.filter((lead) => !lead.metadata?.radar_opportunity_id)');
-    expect(migration).toContain('Radar-derived recipient requires guarded enqueue provenance');
+  it('excludes handed-off Radar leads from nurture auto-enrollment by either provenance path', () => {
+    expect(nurture).toContain("account_id, lead_source, metadata");
+    expect(nurture).toContain('(lead) => !isHandedOffRadarLead(lead)');
+    expect(nurture).toContain('if (filteredLeads.length === 0)');
+    expect(isHandedOffRadarLead({ lead_source: 'wc_renewal_radar' })).toBe(true);
+    expect(isHandedOffRadarLead({ metadata: { radar_opportunity_id: 'opp-1' } })).toBe(true);
+  });
+
+  it('stamps existing leads at handoff without replacing their source or metadata', () => {
+    expect(migration).toContain("CASE WHEN jsonb_typeof(metadata)='object' THEN metadata ELSE '{}'::jsonb END");
+    expect(migration).toContain("|| jsonb_build_object('radar_opportunity_id',o.id)");
+    expect(migration).not.toContain("UPDATE public.leads SET lead_source='wc_renewal_radar'");
+
+    const existingLead = {
+      lead_source: 'referral',
+      metadata: { origin: 'manual', radar_opportunity_id: 'opp-existing' },
+    };
+    expect(existingLead.metadata.origin).toBe('manual');
+    expect(isHandedOffRadarLead(existingLead)).toBe(true);
+  });
+
+  it('normalizes malformed legacy metadata to an object before stamping the handoff marker', () => {
+    for (const legacyMetadata of [[], 'legacy-scalar']) {
+      const normalizedMetadata = (
+        typeof legacyMetadata === 'object' &&
+        legacyMetadata !== null &&
+        !Array.isArray(legacyMetadata)
+      ) ? legacyMetadata : {};
+      const stampedMetadata = { ...normalizedMetadata, radar_opportunity_id: 'opp-legacy' };
+      expect(Array.isArray(stampedMetadata)).toBe(false);
+      expect(isHandedOffRadarLead({ metadata: stampedMetadata })).toBe(true);
+    }
+  });
+
+  it('keeps ordinary leads eligible and safely handles absent or malformed Radar metadata', () => {
+    expect(isHandedOffRadarLead({ lead_source: 'referral', metadata: null })).toBe(false);
+    expect(isHandedOffRadarLead({ metadata: 'not-an-object' })).toBe(false);
+    expect(isHandedOffRadarLead({ metadata: [] })).toBe(false);
+    expect(isHandedOffRadarLead({ metadata: { radar_opportunity_id: null } })).toBe(false);
+    expect(isHandedOffRadarLead({ metadata: { radar_opportunity_id: '  ' } })).toBe(false);
   });
 
   it('binds account-less handoffs directly to lead email and phone', () => {

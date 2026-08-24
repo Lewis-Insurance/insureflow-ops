@@ -5,6 +5,16 @@ import { describe, expect, it } from 'vitest';
 const repoFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
 describe('Radar tenant contracts', () => {
+  it('requires staff status and active workspace administration to configure Radar', () => {
+    const migration = repoFile('supabase/migrations/20260824110000_wc_renewal_radar_phase1.sql');
+    const configureRadar = migration.match(
+      /CREATE FUNCTION public\.configure_radar[\s\S]*?REVOKE ALL ON FUNCTION public\.configure_radar/,
+    )?.[0];
+
+    expect(configureRadar).toContain('IF NOT public.is_staff()');
+    expect(configureRadar).toContain("status='active' AND role IN ('owner','admin')");
+  });
+
   it('tenant-scopes the SECURITY DEFINER task search through active workspace membership', () => {
     const migration = repoFile('supabase/migrations/20260824111000_radar_tasks_filter.sql');
     expect(migration).toContain("awm.status = 'active'");

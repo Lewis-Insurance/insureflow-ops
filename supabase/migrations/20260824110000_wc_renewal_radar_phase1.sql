@@ -234,6 +234,30 @@ LEFT JOIN public.canopy_named_insureds cni ON cni.policy_id = cpol.id AND cni.is
 WHERE a.agency_workspace_id IS NOT NULL
   AND a.deleted_at IS NULL;
 
+-- Return one JSON value so PostgREST's row limit cannot truncate large agency books.
+-- The payload intentionally contains only the fields used by Radar's two match keys.
+CREATE FUNCTION public.radar_own_book_match_keys(p_agency_workspace_id uuid)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(
+    jsonb_agg(DISTINCT jsonb_build_object(
+      'policy_number', book.policy_number,
+      'carrier', book.carrier,
+      'normalized_employer_name', book.normalized_employer_name,
+      'fein', book.fein
+    )),
+    '[]'::jsonb
+  )
+  FROM public.own_book_employers AS book
+  WHERE book.agency_workspace_id = p_agency_workspace_id;
+$$;
+
+REVOKE ALL ON FUNCTION public.radar_own_book_match_keys(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.radar_own_book_match_keys(uuid) TO service_role;
+
 -- A radar queue row still travels through the existing marketing governor.
 ALTER TABLE public.marketing_send_queue
   DROP CONSTRAINT IF EXISTS marketing_send_queue_source_type_check;
@@ -475,7 +499,7 @@ CREATE FUNCTION public.configure_radar(p_workspace_id uuid,p_class_allowlist tex
 RETURNS public.radar_config LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE result public.radar_config;
 BEGIN
-  IF cardinality(p_class_allowlist)=0 OR p_score_threshold NOT BETWEEN 0 AND 100 OR p_weekly_capacity<0 OR NOT EXISTS(
+  IF NOT public.is_staff() OR cardinality(p_class_allowlist)=0 OR p_score_threshold NOT BETWEEN 0 AND 100 OR p_weekly_capacity<0 OR NOT EXISTS(
     SELECT 1 FROM public.agency_workspace_memberships WHERE agency_workspace_id=p_workspace_id AND user_id=auth.uid() AND status='active' AND role IN ('owner','admin')
   ) THEN RAISE EXCEPTION 'invalid config or admin access required' USING ERRCODE='42501'; END IF;
   INSERT INTO public.radar_config(agency_workspace_id,class_allowlist,score_threshold,producer_weekly_capacity)
@@ -527,7 +551,12 @@ BEGIN
     SELECT id INTO result_id FROM public.leads WHERE id=p_existing_lead_id AND agency_workspace_id=o.agency_workspace_id
       AND (p_account_id IS NULL OR account_id IS NULL OR account_id=p_account_id) FOR UPDATE;
     IF result_id IS NULL THEN RAISE EXCEPTION 'lead workspace mismatch' USING ERRCODE='23503'; END IF;
-    IF p_account_id IS NOT NULL THEN UPDATE public.leads SET account_id=p_account_id,updated_at=now() WHERE id=result_id; END IF;
+    UPDATE public.leads SET
+      account_id=COALESCE(p_account_id,account_id),
+      metadata=(CASE WHEN jsonb_typeof(metadata)='object' THEN metadata ELSE '{}'::jsonb END)
+        || jsonb_build_object('radar_opportunity_id',o.id),
+      updated_at=now()
+    WHERE id=result_id;
   ELSE
     IF nullif(btrim(p_first_name),'') IS NULL OR nullif(btrim(p_last_name),'') IS NULL THEN RAISE EXCEPTION 'lead name required' USING ERRCODE='22023'; END IF;
     INSERT INTO public.leads(agency_workspace_id,account_id,first_name,last_name,email,phone,company_name,status,lead_source,source_id,created_by,metadata)

@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { verifyAgencyAuth } from "../_shared/agency-auth.ts";
 import { dedupKey, normalizeEntity, type RadarRow } from "../_shared/radarIngest.ts";
+import { radarOwnBookKeys } from "../_shared/radarOwnBook.ts";
 
 const reply = (body: unknown, status: number, headers: Record<string, string>) =>
   new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
@@ -42,14 +43,11 @@ serve(async (req) => {
     const { data: rows, error: rowsError } = await stagingQuery;
     if (rowsError) throw rowsError;
 
-    const { data: ownBook, error: ownBookError } = await db.from("own_book_employers")
-      .select("policy_number,carrier,normalized_employer_name,fein")
-      .eq("agency_workspace_id", agencyWorkspaceId);
+    const { data: ownBook, error: ownBookError } = await db.rpc("radar_own_book_match_keys", {
+      p_agency_workspace_id: agencyWorkspaceId,
+    });
     if (ownBookError) throw ownBookError;
-    const ownPolicies = new Set((ownBook ?? []).map((book) =>
-      `${normalizeEntity(book.policy_number)}:${normalizeEntity(book.carrier)}`));
-    const ownEntities = new Set((ownBook ?? []).filter((book) => book.fein).map((book) =>
-      `${normalizeEntity(book.normalized_employer_name)}:${String(book.fein).replace(/\D/g, "")}`));
+    const { policies: ownPolicies, entities: ownEntities } = radarOwnBookKeys(ownBook);
     const allowlist = new Set((config.class_allowlist ?? []).map((code: string) => code.replace(/\D/g, "")));
     if (!allowlist.size) return reply({ error: "radar_config.class_allowlist must not be empty" }, 409, cors);
     const summary = { processed: 0, inserted: 0, duplicates: 0, excluded: 0, tasked: 0, queued: 0, errors: [] as unknown[] };

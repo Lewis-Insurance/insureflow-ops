@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { zipSync, strToU8 } from 'fflate';
 import { canonicalizeRow, dedupKey, normalizeEntity, preflightXlsx, validateRow } from '../../../supabase/functions/_shared/radarIngest';
+import { radarOwnBookKeys } from '../../../supabase/functions/_shared/radarOwnBook';
 
 const root = process.cwd();
 const migration = readFileSync(resolve(root, 'supabase/migrations/20260824110000_wc_renewal_radar_phase1.sql'), 'utf8');
@@ -26,6 +27,23 @@ describe('Radar Phase 1 contracts', () => {
 
   it('does not reuse the existing opportunities CRM', () => {
     expect(`${migration}\n${upsert}`).not.toContain('public.opportunities');
+  });
+
+  it('loads complete own-book match keys beyond the PostgREST row cap', () => {
+    expect(upsert).toContain('radar_own_book_match_keys');
+    expect(upsert).not.toContain('from("own_book_employers")');
+    expect(migration).toContain('RETURNS jsonb');
+    const ownBook = Array.from({ length: 1_001 }, (_, index) => ({
+      policy_number: `WC-${index}`,
+      carrier: 'Carrier',
+      normalized_employer_name: `employer${index}`,
+      fein: String(index).padStart(9, '0'),
+    }));
+    const keys = radarOwnBookKeys(ownBook);
+    expect(keys.policies).toHaveLength(1_001);
+    expect(keys.entities).toHaveLength(1_001);
+    expect(keys.policies).toContain('wc1000:carrier');
+    expect(keys.entities).toContain('employer1000:000001000');
   });
 
   it('runs dedupe, score, atomic task, and explicit handoff surfaces', () => {
