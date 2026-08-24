@@ -20,6 +20,8 @@ import { StatusPill, Chip, SectionLabel, TriageTile, SkeletonRow } from '@/compo
 import { humanizeEnum } from '@/lib/format';
 import { taskAssigneeLabel } from '@/lib/taskAssignee';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { RadarStaffUpload } from '@/components/tasks/RadarStaffUpload';
 
 // Cohorts are computed server-side; clicking a tile filters the rows to it.
 type Cohort = 'all' | 'overdue' | 'due_this_week' | 'high_priority' | 'completed';
@@ -100,6 +102,7 @@ function dueBand(dueAt: string | null, completedAt: string | null): DueBand | nu
 }
 
 export default function TasksPage() {
+  const { isStaff, profile } = useAuth();
   const [view, setView] = useState<View>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -380,6 +383,17 @@ export default function TasksPage() {
 
         {view === 'list' ? (
           <>
+            {radarOnly && isStaff && profile?.default_agency_workspace_id ? (
+              <RadarStaffUpload
+                workspaceId={profile.default_agency_workspace_id}
+                onComplete={() => {
+                  window.dispatchEvent(new CustomEvent('tasks:updated'));
+                  refetch();
+                  refetchCounts();
+                }}
+              />
+            ) : null}
+
             {/* Filter row */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative min-w-0 flex-1 sm:max-w-xs">

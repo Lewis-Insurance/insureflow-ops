@@ -12,6 +12,15 @@ vi.mock('@/components/tasks/TaskCalendarView', () => ({ TaskCalendarView: () => 
 vi.mock('@/components/tasks/TaskAnalyticsDashboard', () => ({ TaskAnalyticsDashboard: () => null }));
 vi.mock('@/components/tasks/TaskForm', () => ({ TaskForm: () => null }));
 
+vi.mock('@/components/tasks/RadarStaffUpload', () => ({
+  RadarStaffUpload: ({ onComplete }: { onComplete?: () => void }) => (
+    <section>
+      <h2>Add Renewal radar records</h2>
+      <button type="button" onClick={onComplete}>Complete radar upload</button>
+    </section>
+  ),
+}));
+
 vi.mock('@/components/tasks/TaskEditModal', () => ({
   TaskEditModal: ({
     open,
@@ -31,6 +40,10 @@ vi.mock('@/components/tasks/TaskEditModal', () => ({
 
 vi.mock('@/hooks/use-toast', () => ({
   toast: vi.fn(),
+}));
+
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: vi.fn(() => ({ isStaff: false, profile: null })),
 }));
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -79,6 +92,7 @@ import { useTaskSearch } from '@/hooks/useTaskSearch';
 import { useTaskTriageCounts } from '@/hooks/useTaskTriageCounts';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 function mockTaskFetch() {
   const tasksSingle = vi.fn().mockResolvedValue({
@@ -138,6 +152,7 @@ function renderWithTasks(tasks: Array<Record<string, unknown>>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(useAuth).mockReturnValue({ isStaff: false, profile: null } as ReturnType<typeof useAuth>);
   vi.mocked(useTaskTriageCounts).mockReturnValue({
     counts: {
       open_total: 2,
@@ -152,6 +167,53 @@ beforeEach(() => {
 });
 
 describe('TasksPage scope and assignee', () => {
+  it('shows the upload only to staff in the Renewal radar list view', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isStaff: true,
+      profile: { default_agency_workspace_id: 'workspace-1' },
+    } as ReturnType<typeof useAuth>);
+
+    render(
+      <MemoryRouter initialEntries={['/tasks?radar=true']}>
+        <TasksPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Add Renewal radar records' })).toBeInTheDocument();
+  });
+
+  it('does not show the upload to clients when Renewal radar is on', () => {
+    render(
+      <MemoryRouter initialEntries={['/tasks?radar=true']}>
+        <TasksPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('heading', { name: 'Add Renewal radar records' })).not.toBeInTheDocument();
+  });
+
+  it('refreshes task surfaces after a radar upload completes', async () => {
+    const user = userEvent.setup();
+    const updatedListener = vi.fn();
+    window.addEventListener('tasks:updated', updatedListener);
+    vi.mocked(useAuth).mockReturnValue({
+      isStaff: true,
+      profile: { default_agency_workspace_id: 'workspace-1' },
+    } as ReturnType<typeof useAuth>);
+
+    render(
+      <MemoryRouter initialEntries={['/tasks?radar=true']}>
+        <TasksPage />
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Complete radar upload' }));
+
+    expect(updatedListener).toHaveBeenCalledOnce();
+    expect(listRefetch).toHaveBeenCalled();
+    expect(triageRefetch).toHaveBeenCalled();
+    window.removeEventListener('tasks:updated', updatedListener);
+  });
+
   it('renders Unclaimed when assignee_name is null', () => {
     renderWithTasks([
       {
