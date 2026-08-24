@@ -226,42 +226,41 @@ export function useAORenewalKPIs() {
   return useQuery({
     queryKey: ["ao-renewal-kpis"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ao_renewals")
-        .select("status, current_premium, moved_premium, moved_carrier");
+      const countByStatus = async (status: string): Promise<number> => {
+        const { count, error } = await supabase
+          .from("ao_renewals")
+          .select("id", { count: "exact", head: true })
+          .eq("status", status);
+        if (error) throw error;
+        return count ?? 0;
+      };
 
-      if (error) {
+      const sumByStatus = async (column: "current_premium" | "moved_premium", status: string) => {
+        const { data, error } = await supabase
+          .from("ao_renewals")
+          .select(`${column}.sum()`)
+          .eq("status", status);
+        if (error) throw error;
+        const sum = data?.[0]?.sum;
+        return sum != null ? Number(sum) : 0;
+      };
+
+      let results: [number, number, number, number, number, number];
+      try {
+        results = await Promise.all([
+          countByStatus("lost"),
+          countByStatus("cancelled"),
+          countByStatus("moved"),
+          sumByStatus("current_premium", "lost"),
+          sumByStatus("current_premium", "cancelled"),
+          sumByStatus("moved_premium", "moved"),
+        ]);
+      } catch (error) {
         logger.error("Error fetching AO renewal KPIs:", error);
         throw error;
       }
 
-      const renewals = data || [];
-
-      let lostPremium = 0;
-      let cancelledPremium = 0;
-      let movedPremium = 0;
-      let lostCount = 0;
-      let cancelledCount = 0;
-      let movedCount = 0;
-
-      renewals.forEach((renewal) => {
-        const premium = renewal.current_premium || 0;
-
-        switch (renewal.status) {
-          case "lost":
-            lostCount++;
-            lostPremium += premium;
-            break;
-          case "cancelled":
-            cancelledCount++;
-            cancelledPremium += premium;
-            break;
-          case "moved":
-            movedCount++;
-            movedPremium += renewal.moved_premium || 0;
-            break;
-        }
-      });
+      const [lostCount, cancelledCount, movedCount, lostPremium, cancelledPremium, movedPremium] = results;
 
       const premiumLost = lostPremium + cancelledPremium;
       const policiesLost = lostCount + cancelledCount;
