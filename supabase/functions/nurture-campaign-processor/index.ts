@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAuth } from '../_shared/auth.ts';
+import { isHandedOffRadarLead } from '../_shared/radarLeadProvenance.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,8 @@ interface Lead {
   lead_score: number;
   insurance_types: string[];
   account_id: string;
+  lead_source?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 Deno.serve(async (req) => {
@@ -86,7 +89,7 @@ Deno.serve(async (req) => {
         // Build lead query based on trigger conditions
         let leadQuery = supabase
           .from('leads')
-          .select('id, status, lead_score, insurance_types, account_id')
+          .select('id, status, lead_score, insurance_types, account_id, lead_source, metadata')
           .eq('account_id', campaign.account_id);
 
         const conditions = campaign.trigger_conditions || {};
@@ -132,13 +135,27 @@ Deno.serve(async (req) => {
         console.log(`📊 Found ${matchingLeads.length} potential leads`);
 
         // Additional filtering for insurance types and tags
-        let filteredLeads = matchingLeads as Lead[];
+        let filteredLeads = (matchingLeads as Lead[]).filter(
+          (lead) => !isHandedOffRadarLead(lead)
+        );
 
         if (conditions.insurance_types && conditions.insurance_types.length > 0) {
           filteredLeads = filteredLeads.filter((lead) => {
             const leadTypes = lead.insurance_types || [];
             return conditions.insurance_types!.some((type) => leadTypes.includes(type));
           });
+        }
+
+        if (filteredLeads.length === 0) {
+          console.log(`ℹ️ No eligible non-Radar leads found for ${campaign.name}`);
+          results.push({
+            campaign_id: campaign.id,
+            campaign_name: campaign.name,
+            success: true,
+            enrolled: 0,
+            skipped: matchingLeads.length,
+          });
+          continue;
         }
 
         // Check which leads are already enrolled

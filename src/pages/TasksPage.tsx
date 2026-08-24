@@ -104,6 +104,7 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const scope = parseScopeFromUrl(searchParams.get('scope')) ?? 'mine';
+  const radarOnly = searchParams.get('radar') === 'true';
   const [cohort, setCohort] = useTriageCohortFromUrl<Cohort>(TASK_COHORTS);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -123,6 +124,15 @@ export default function TasksPage() {
     });
   };
 
+  const setRadarOnly = (enabled: boolean) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (enabled) params.set('radar', 'true');
+      else params.delete('radar');
+      return params;
+    });
+  };
+
   const { tasks, loading, loadingMore, hasMore, fetchTasks, fetchNextPage, refetch } = useTaskSearch();
   const { counts, refetch: refetchCounts } = useTaskTriageCounts(scope);
   const { createTask } = useTasks();
@@ -138,25 +148,26 @@ export default function TasksPage() {
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
-      fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope);
+      fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope, radarOnly);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(
-      () => fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope),
+      () => fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope, radarOnly),
       250,
     );
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, cohort, scope]);
+  }, [searchQuery, cohort, scope, radarOnly]);
 
   const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
-  const filtersActive = cohort !== 'all' || searchQuery.length > 0;
+  const filtersActive = cohort !== 'all' || searchQuery.length > 0 || radarOnly;
   const clearAll = () => {
     setCohort('all');
     setSearchQuery('');
+    setRadarOnly(false);
   };
 
   const handleCreateTask = async (taskData: Partial<Task>) => {
@@ -381,6 +392,20 @@ export default function TasksPage() {
                   className="h-9 rounded-cc-md border-cc-border-interactive bg-cc-surface-raised pl-9 text-cc-text-primary placeholder:text-cc-text-muted"
                 />
               </div>
+
+              <button
+                type="button"
+                onClick={() => setRadarOnly(!radarOnly)}
+                aria-pressed={radarOnly}
+                className={cn(
+                  'rounded-cc-md border px-3 py-1.5 text-sm transition-colors duration-fast',
+                  radarOnly
+                    ? 'border-cc-border-interactive bg-cc-surface-overlay text-cc-text-primary'
+                    : 'border-cc-border-subtle text-cc-text-muted hover:text-cc-text-secondary',
+                )}
+              >
+                Renewal radar
+              </button>
 
               {filtersActive && (
                 <button

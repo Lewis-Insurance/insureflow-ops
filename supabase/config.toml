@@ -101,7 +101,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.lead-scoring-engine]
-verify_jwt = true
+verify_jwt = false
 
 [functions.nurture-campaign-processor]
 verify_jwt = false
@@ -189,3 +189,19 @@ verify_jwt = false
 
 [functions.commercial-intake]
 verify_jwt = false
+
+[functions.radar-poc-harvest]
+verify_jwt = true
+
+[functions.radar-opportunity-upsert]
+verify_jwt = false
+
+# Scheduled calls authenticate inside the function with a fail-closed CRON_SECRET.
+[functions.radar-swo-pull]
+verify_jwt = false
+
+[functions.radar-compliance-guard]
+verify_jwt = true
+
+[functions.radar-guarded-enqueue]
+verify_jwt = true

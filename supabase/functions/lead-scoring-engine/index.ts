@@ -1,119 +1,27 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import {
+  calculateLeadScore,
+  calculateRadarScore,
+  deriveRadarScoreFactors,
+  type LeadScoringFactors,
+} from './scoring.ts';
 
-interface LeadScoringFactors {
-  // Insurance needs complexity (0-25 points)
-  insuranceNeeds: string[];
-  
-  // Premium potential (0-20 points)
-  currentPremium: number | null;
-  
-  // Decision timeline (0-20 points)
-  decisionTimeframe: 'immediate' | '30_days' | '60_days' | '90_days' | 'no_rush' | null;
-  
-  // Contact completeness (0-15 points)
-  hasEmail: boolean;
-  hasPhone: boolean;
-  
-  // Engagement signals (0-10 points)
-  source: string | null;
-  
-  // Current carrier dissatisfaction (0-10 points)
-  hasCurrentCarrier: boolean;
+interface RadarScoringInput {
+  opportunityId: string;
 }
 
-function calculateLeadScore(factors: LeadScoringFactors): number {
-  let score = 0;
-  
-  // 1. Insurance Needs Complexity (0-25 points)
-  const needs = factors.insuranceNeeds || [];
-  if (needs.includes('commercial')) {
-    score += 25; // Commercial = highest value
-  } else if (needs.length >= 3) {
-    score += 20; // Multiple lines = high value
-  } else if (needs.length === 2) {
-    score += 15; // Two lines = good value
-  } else if (needs.length === 1) {
-    score += 10; // Single line = moderate value
-  }
-  
-  // 2. Premium Potential (0-20 points)
-  if (factors.currentPremium) {
-    if (factors.currentPremium >= 5000) {
-      score += 20; // High premium = high value
-    } else if (factors.currentPremium >= 2500) {
-      score += 15;
-    } else if (factors.currentPremium >= 1000) {
-      score += 10;
-    } else {
-      score += 5;
-    }
-  } else {
-    score += 8; // Unknown premium = assume moderate
-  }
-  
-  // 3. Decision Timeline (0-20 points)
-  switch (factors.decisionTimeframe) {
-    case 'immediate':
-      score += 20; // Ready to buy now
-      break;
-    case '30_days':
-      score += 15; // Very soon
-      break;
-    case '60_days':
-      score += 10; // Soon
-      break;
-    case '90_days':
-      score += 5; // Later
-      break;
-    case 'no_rush':
-      score += 2; // Just shopping
-      break;
-    default:
-      score += 8; // Unknown = assume moderate urgency
-  }
-  
-  // 4. Contact Completeness (0-15 points)
-  if (factors.hasEmail && factors.hasPhone) {
-    score += 15; // Both = excellent
-  } else if (factors.hasEmail || factors.hasPhone) {
-    score += 10; // One = good
-  } else {
-    score += 0; // Neither = poor
-  }
-  
-  // 5. Lead Source Quality (0-10 points)
-  const highQualitySources = ['referral', 'website', 'event'];
-  const mediumQualitySources = ['social_media', 'email', 'advertising'];
-  
-  if (factors.source && highQualitySources.includes(factors.source)) {
-    score += 10;
-  } else if (factors.source && mediumQualitySources.includes(factors.source)) {
-    score += 6;
-  } else {
-    score += 3;
-  }
-  
-  // 6. Current Carrier (Shopping Signal) (0-10 points)
-  if (factors.hasCurrentCarrier) {
-    score += 10; // Already has insurance = ready to switch
-  } else {
-    score += 5; // New to insurance = moderate
-  }
-  
-  // Ensure score is between 0 and 100
-  return Math.min(Math.max(score, 0), 100);
-}
+class WorkspaceScopeError extends Error {}
 
-async function scoreLeads(supabaseClient: any, accountId: string | undefined, leadIds?: string[]) {
+async function scoreLeads(supabaseClient: any, workspaceIds: string[], leadIds?: string[]) {
   try {
     // Build query
     let query = supabaseClient
       .from('leads')
       .select(`
         id,
-        account_id,
+        agency_workspace_id,
         insurance_types,
         current_premium,
         decision_timeframe,
@@ -124,10 +32,8 @@ async function scoreLeads(supabaseClient: any, accountId: string | undefined, le
         lead_sources (type)
       `);
 
-    // SECURITY: Filter by account if user has specific account
-    if (accountId) {
-      query = query.eq('account_id', accountId);
-    }
+    // SECURITY: Service-role reads must always be constrained to active staff workspaces.
+    query = query.in('agency_workspace_id', workspaceIds);
 
     // Filter by specific lead IDs if provided
     if (leadIds && leadIds.length > 0) {
@@ -137,6 +43,9 @@ async function scoreLeads(supabaseClient: any, accountId: string | undefined, le
     const { data: leads, error: fetchError } = await query;
     
     if (fetchError) throw fetchError;
+    if (leadIds && new Set(leads?.map((lead: any) => lead.id)).size !== new Set(leadIds).size) {
+      throw new WorkspaceScopeError('One or more leads are outside the active workspace scope');
+    }
     if (!leads || leads.length === 0) {
       return { success: true, message: 'No leads to score', scored: 0 };
     }
@@ -169,7 +78,8 @@ async function scoreLeads(supabaseClient: any, accountId: string | undefined, le
           lead_score: update.lead_score,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', update.id);
+        .eq('id', update.id)
+        .in('agency_workspace_id', workspaceIds);
       
       if (updateError) throw updateError;
     }
@@ -205,21 +115,84 @@ Deno.serve(async (req) => {
       }
     );
 
-    // SECURITY: Require authentication
-    const authResult = await requireAuth(req, supabaseClient, corsHeaders);
-    if (authResult instanceof Response) {
-      return authResult; // Return 401 if auth failed
+    const { leadIds, rescore_all, radar } = await req.json() as {
+      leadIds?: string[];
+      rescore_all?: boolean;
+      radar?: RadarScoringInput;
+    };
+    const providedInternal = req.headers.get('X-Radar-Internal-Secret');
+    const expectedInternal = Deno.env.get('RADAR_INTERNAL_SECRET');
+    const internalRadar = !!radar && !!providedInternal && !!expectedInternal && constantTimeEqual(providedInternal, expectedInternal);
+    let workspaceIds: string[] = [];
+    if (!internalRadar) {
+      const authResult = await requireAuth(req, supabaseClient, corsHeaders);
+      if (authResult instanceof Response) return authResult;
+      const { data: memberships, error: membershipsError } = await supabaseClient
+        .from('agency_workspace_memberships').select('agency_workspace_id')
+        .eq('user_id', authResult.id).eq('status', 'active');
+      if (membershipsError) throw membershipsError;
+      workspaceIds = [...new Set((memberships || []).map((row: { agency_workspace_id: string }) => row.agency_workspace_id))];
+      if (workspaceIds.length === 0) return new Response(JSON.stringify({ error: 'Forbidden: active workspace membership required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
-    const authenticatedUser = authResult;
 
-    // Parse request body
-    const { leadIds, rescore_all } = await req.json();
+    if (radar) {
+      if (leadIds || rescore_all) {
+        return new Response(JSON.stringify({ error: 'Radar and lead scoring inputs are mutually exclusive' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (!radar.opportunityId) {
+        return new Response(JSON.stringify({ error: 'radar.opportunityId is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      let opportunityQuery = supabaseClient
+        .from('renewal_opportunities')
+        .select('id, agency_workspace_id, kind, class_code, expiration_date, estimated_premium, employer_name, county, policy_number, carrier')
+        .eq('id', radar.opportunityId);
+      if (!internalRadar) opportunityQuery = opportunityQuery.in('agency_workspace_id', workspaceIds);
+      const { data: opportunity, error: opportunityError } = await opportunityQuery.single();
+      if (opportunityError || !opportunity) throw opportunityError || new Error('Radar opportunity not found');
+
+      const { data: config, error: configError } = await supabaseClient
+        .from('radar_config')
+        .select('class_allowlist')
+        .eq('agency_workspace_id', opportunity.agency_workspace_id)
+        .single();
+      if (configError || !config) throw configError || new Error('Radar configuration not found');
+
+      const factors = deriveRadarScoreFactors(opportunity, config.class_allowlist || []);
+      const score = calculateRadarScore(factors);
+      const scoredAt = new Date().toISOString();
+      const { error: updateError } = await supabaseClient
+        .from('renewal_opportunities')
+        .update({ radar_score: score, score_factors: factors, scored_at: scoredAt })
+        .eq('id', radar.opportunityId)
+        .eq('agency_workspace_id', opportunity.agency_workspace_id);
+      if (updateError) throw updateError;
+
+      return new Response(JSON.stringify({
+        success: true,
+        opportunityId: radar.opportunityId,
+        score,
+        factors,
+        scoredAt,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
     
     // Validate request
-    if (!leadIds && !rescore_all) {
+    if (!rescore_all && (!Array.isArray(leadIds) || leadIds.length === 0)) {
       return new Response(
         JSON.stringify({
-          error: 'Either leadIds array or rescore_all flag must be provided',
+          error: 'Either radar, leadIds array, or rescore_all flag must be provided',
         }),
         {
           status: 400,
@@ -228,10 +201,10 @@ Deno.serve(async (req) => {
       );
     }
     
-    // Score leads - pass accountId to restrict to user's account
+    // Score leads only inside the caller's active agency workspaces.
     const result = await scoreLeads(
       supabaseClient,
-      authenticatedUser.accountId,
+      workspaceIds,
       rescore_all ? undefined : leadIds
     );
     
@@ -246,9 +219,15 @@ Deno.serve(async (req) => {
         error: (error instanceof Error ? error.message : String(error)) || 'Internal server error',
       }),
       {
-        status: 500,
+        status: error instanceof WorkspaceScopeError ? 403 : 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
 });
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const size = Math.max(left.length, right.length); let difference = left.length ^ right.length;
+  for (let i = 0; i < size; i++) difference |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
+  return difference === 0;
+}

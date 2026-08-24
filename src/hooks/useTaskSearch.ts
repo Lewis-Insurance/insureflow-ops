@@ -31,6 +31,7 @@ interface TaskFilters {
   sort?: string;
   cohort?: string;
   scope?: string;
+  radar?: boolean;
 }
 
 export function useTaskSearch() {
@@ -53,16 +54,17 @@ export function useTaskSearch() {
     if (f.scope === 'mine' || f.scope === 'unclaimed' || f.scope === 'office') {
       out.scope = f.scope;
     }
+    if (f.radar) out.radar = 'true';
     return out;
   };
 
   // Load the FIRST page for a given filter set, replacing the current rows.
   // Cohort is applied server-side so the rendered rows match the triage tile.
-  const fetchTasks = async (q = '', sort = 'due_asc', cohort?: string, scope = 'mine') => {
+  const fetchTasks = async (q = '', sort = 'due_asc', cohort?: string, scope = 'mine', radar = false) => {
     const seq = ++requestSeqRef.current;
     try {
       setLoading(true);
-      filtersRef.current = { q, sort, cohort, scope };
+      filtersRef.current = { q, sort, cohort, scope, radar };
 
       const { data, error } = await supabase.rpc('search_tasks', {
         p_filters: buildFilters(filtersRef.current),
@@ -139,6 +141,7 @@ export function useTaskSearch() {
         filtersRef.current.sort ?? 'due_asc',
         filtersRef.current.cohort,
         filtersRef.current.scope ?? 'mine',
+        filtersRef.current.radar ?? false,
       ),
   };
 }
