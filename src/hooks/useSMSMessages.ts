@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { createClientSendApproval } from '@/lib/clientSendApproval';
+import { startOfDay } from 'date-fns';
 
 export interface SMSMessage {
   id: string;
@@ -342,35 +343,35 @@ export const useSMSStats = () => {
     queryKey: ['sms-stats'],
     queryFn: async () => {
       try {
-        const { data: messages, error } = await supabase
-          .from('sms_messages')
-          .select('direction, status, created_at');
+        const countMessages = async (criteria?: {
+          direction?: 'inbound' | 'outbound';
+          status?: string;
+          statuses?: string[];
+          createdFrom?: string;
+        }): Promise<number> => {
+          let query = supabase
+            .from('sms_messages')
+            .select('id', { count: 'exact', head: true });
+          if (criteria?.direction) query = query.eq('direction', criteria.direction);
+          if (criteria?.status) query = query.eq('status', criteria.status);
+          if (criteria?.statuses) query = query.in('status', criteria.statuses);
+          if (criteria?.createdFrom) query = query.gte('created_at', criteria.createdFrom);
 
-        if (error) {
-          logger.warn('Error fetching SMS stats:', error.message);
-          return {
-            total: 0,
-            inbound: 0,
-            outbound: 0,
-            delivered: 0,
-            failed: 0,
-            today: 0,
-          };
-        }
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const stats = {
-          total: messages?.length || 0,
-          inbound: messages?.filter(m => m.direction === 'inbound').length || 0,
-          outbound: messages?.filter(m => m.direction === 'outbound').length || 0,
-          delivered: messages?.filter(m => m.status === 'delivered').length || 0,
-          failed: messages?.filter(m => m.status === 'failed' || m.status === 'undelivered').length || 0,
-          today: messages?.filter(m => new Date(m.created_at) >= today).length || 0,
+          const { count, error } = await query;
+          if (error) throw error;
+          return count ?? 0;
         };
 
-        return stats;
+        const [total, inbound, outbound, delivered, failed, today] = await Promise.all([
+          countMessages(),
+          countMessages({ direction: 'inbound' }),
+          countMessages({ direction: 'outbound' }),
+          countMessages({ status: 'delivered' }),
+          countMessages({ statuses: ['failed', 'undelivered'] }),
+          countMessages({ createdFrom: startOfDay(new Date()).toISOString() }),
+        ]);
+
+        return { total, inbound, outbound, delivered, failed, today };
       } catch (err) {
         logger.error('Error in SMS stats:', err);
         return {
@@ -385,5 +386,3 @@ export const useSMSStats = () => {
     },
   });
 };
-
-

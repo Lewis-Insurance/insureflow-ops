@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { differenceInDays, startOfMonth, endOfMonth, addDays } from "date-fns";
+import { differenceInDays, addDays } from "date-fns";
+import { addDaysLocalDate, todayLocalDate } from "@/lib/date/localDate";
 
 export interface KPIData {
   totalRenewals: number;
@@ -11,47 +12,81 @@ export interface KPIData {
   atRisk: number;
 }
 
-export const useAOAnalyticsKPIs = (filters?: { dateFrom?: string; dateTo?: string }) => {
+type AOAnalyticsFilters = { dateFrom?: string; dateTo?: string };
+
+interface RenewalCountCriteria {
+  status?: string;
+  statuses?: string[];
+  renewalDateFrom?: string;
+  renewalDateTo?: string;
+  renewalDateBefore?: string;
+}
+
+async function countRenewals(
+  filters?: AOAnalyticsFilters,
+  criteria: RenewalCountCriteria = {},
+): Promise<number> {
+  let query = supabase
+    .from("ao_renewals")
+    .select("id", { count: "exact", head: true });
+
+  if (filters?.dateFrom) query = query.gte("renewal_date", filters.dateFrom);
+  if (filters?.dateTo) query = query.lte("renewal_date", filters.dateTo);
+  if (criteria.status) query = query.eq("status", criteria.status);
+  if (criteria.statuses) query = query.in("status", criteria.statuses);
+  if (criteria.renewalDateFrom) query = query.gte("renewal_date", criteria.renewalDateFrom);
+  if (criteria.renewalDateTo) query = query.lte("renewal_date", criteria.renewalDateTo);
+  if (criteria.renewalDateBefore) query = query.lt("renewal_date", criteria.renewalDateBefore);
+
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function sumRenewalPremium(filters?: AOAnalyticsFilters): Promise<number> {
+  let query = supabase.from("ao_renewals").select("current_premium.sum()");
+  if (filters?.dateFrom) query = query.gte("renewal_date", filters.dateFrom);
+  if (filters?.dateTo) query = query.lte("renewal_date", filters.dateTo);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  const sum = data?.[0]?.sum;
+  return sum != null ? Number(sum) : 0;
+}
+
+export const useAOAnalyticsKPIs = (filters?: AOAnalyticsFilters) => {
   return useQuery({
     queryKey: ["ao-analytics-kpis", filters],
     queryFn: async () => {
-      let query = supabase.from("ao_renewals").select("*");
+      const today = todayLocalDate();
+      const thirtyDaysFromNow = addDaysLocalDate(today, 30);
+      const fourteenDaysFromNow = addDaysLocalDate(today, 14);
 
-      if (filters?.dateFrom) {
-        query = query.gte("renewal_date", filters.dateFrom);
-      }
-      if (filters?.dateTo) {
-        query = query.lte("renewal_date", filters.dateTo);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const today = new Date();
-      const thirtyDaysFromNow = addDays(today, 30);
-
-      const totalRenewals = data.length;
-      const totalPremium = data.reduce((sum, r) => sum + (r.current_premium || 0), 0);
-      
-      const upcoming30Days = data.filter(r => {
-        const renewalDate = new Date(r.renewal_date);
-        return renewalDate >= today && renewalDate <= thirtyDaysFromNow;
-      }).length;
+      const [
+        totalRenewals,
+        totalPremium,
+        upcoming30Days,
+        renewed,
+        lost,
+        cancelled,
+        atRisk,
+      ] = await Promise.all([
+        countRenewals(filters),
+        sumRenewalPremium(filters),
+        countRenewals(filters, { renewalDateFrom: today, renewalDateTo: thirtyDaysFromNow }),
+        countRenewals(filters, { status: "renewed" }),
+        countRenewals(filters, { status: "lost" }),
+        countRenewals(filters, { status: "cancelled" }),
+        countRenewals(filters, {
+          statuses: ["pending", "contacted"],
+          renewalDateBefore: fourteenDaysFromNow,
+        }),
+      ]);
 
       const avgPremium = totalRenewals > 0 ? totalPremium / totalRenewals : 0;
-
-      const renewed = data.filter(r => r.status === 'renewed').length;
-      const lost = data.filter(r => r.status === 'lost').length;
-      const cancelled = data.filter(r => r.status === 'cancelled').length;
       const renewalRate = (renewed + lost + cancelled) > 0 
         ? (renewed / (renewed + lost + cancelled)) * 100 
         : 0;
-
-      const atRisk = data.filter(r => {
-        const renewalDate = new Date(r.renewal_date);
-        const daysUntil = differenceInDays(renewalDate, today);
-        return (r.status === 'pending' || r.status === 'contacted') && daysUntil < 14;
-      }).length;
 
       return {
         totalRenewals,
