@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Chip, Skeleton, StatusPill } from '@/components/cc';
 import { QuoteVsIncumbentComparison } from '@/components/quotes/QuoteVsIncumbentComparison';
+import { ClientEnglishPackPanel } from '@/components/document-analysis/ClientEnglishPackPanel';
 import { useExtractWritebackProposals } from '@/hooks/useExtractWritebackProposals';
 import {
   proposalCoverageCount,
@@ -208,6 +209,14 @@ export function ExtractWritebackProposalsPanel({
                   carrierHint={proposal.carrier_name}
                   claimsMade={snapshot.claims_made}
                   defenseInsideLimits={snapshot.defense_inside_limits}
+                />
+                <ClientEnglishPackPanel
+                  snapshot={snapshot}
+                  confirmedSnapshotHash={proposal.snapshot_hash}
+                  accountId={accountId}
+                  quoteId={proposal.quote_id}
+                  quoteLineOfBusiness={payload.quote.line_of_business}
+                  carrierHint={proposal.carrier_name}
                 />
               </div>
             );
