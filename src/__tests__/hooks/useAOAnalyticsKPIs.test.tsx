@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -9,6 +9,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 import { useAOAnalyticsKPIs } from '@/hooks/useAOAnalytics';
 import { useAORenewalKPIs } from '@/hooks/useAORenewalAnalytics';
+import { addDaysLocalDate, todayLocalDate } from '@/lib/date/localDate';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SelectCall {
@@ -59,11 +60,7 @@ function mockQueries(counts: number[], sums: number[]) {
 describe('AO KPI hooks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-24T16:00:00Z'));
   });
-
-  afterEach(() => vi.useRealTimers());
 
   it('uses exact head counts and server aggregates for uncapped analytics KPIs', async () => {
     const calls = mockQueries([2500, 1200, 1400, 300, 100, 275], [5_000_000]);
@@ -72,7 +69,6 @@ describe('AO KPI hooks', () => {
       { wrapper: createWrapper() },
     );
 
-    await vi.runAllTimersAsync();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toMatchObject({
@@ -101,15 +97,16 @@ describe('AO KPI hooks', () => {
     expect(aggregateCall?.filters).toContainEqual(['gte', 'renewal_date', '2026-01-01']);
     expect(aggregateCall?.filters).toContainEqual(['lte', 'renewal_date', '2026-12-31']);
 
+    const today = todayLocalDate();
     const upcomingCall = countCalls.find((call) =>
       call.filters.some(([method, column, value]) =>
-        method === 'gte' && column === 'renewal_date' && value === '2026-08-24'));
-    expect(upcomingCall?.filters).toContainEqual(['lte', 'renewal_date', '2026-09-23']);
+        method === 'gte' && column === 'renewal_date' && value === today));
+    expect(upcomingCall?.filters).toContainEqual(['lte', 'renewal_date', addDaysLocalDate(today, 30)]);
 
     const atRiskCall = countCalls.find((call) =>
       call.filters.some(([method, column]) => method === 'in' && column === 'status'));
     expect(atRiskCall?.filters).toContainEqual(['in', 'status', ['pending', 'contacted']]);
-    expect(atRiskCall?.filters).toContainEqual(['lt', 'renewal_date', '2026-09-07']);
+    expect(atRiskCall?.filters).toContainEqual(['lt', 'renewal_date', addDaysLocalDate(today, 14)]);
 
     const terminalStatuses = countCalls.flatMap((call) =>
       call.filters
@@ -123,7 +120,6 @@ describe('AO KPI hooks', () => {
     const calls = mockQueries([1100, 200, 1300], [220_000, 30_000, 750_000]);
     const { result } = renderHook(() => useAORenewalKPIs(), { wrapper: createWrapper() });
 
-    await vi.runAllTimersAsync();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toEqual({

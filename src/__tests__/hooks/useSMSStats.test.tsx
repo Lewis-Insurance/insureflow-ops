@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -52,17 +52,12 @@ function mockCounts(counts: number[]) {
 describe('useSMSStats', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-24T16:00:00Z'));
   });
-
-  afterEach(() => vi.useRealTimers());
 
   it('uses filtered exact head counts for all six uncapped SMS tiles', async () => {
     const calls = mockCounts([5000, 2400, 2600, 2100, 1200, 1500]);
     const { result } = renderHook(() => useSMSStats(), { wrapper: createWrapper() });
 
-    await vi.runAllTimersAsync();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toEqual({
