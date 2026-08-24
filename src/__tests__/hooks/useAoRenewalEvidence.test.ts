@@ -30,6 +30,7 @@ const calls = {
   documentOrders: [] as Array<[string, { ascending: boolean }]>,
   quotes: [] as string[][],
   fallback: [] as string[][],
+  fallbackSelects: [] as string[],
 };
 function installBuilders() {
   from.mockImplementation((table: string) => {
@@ -48,7 +49,7 @@ function installBuilders() {
       return builder;
     }
     const fallback = {
-      select: vi.fn(() => fallback),
+      select: vi.fn((columns: string) => { calls.fallbackSelects.push(columns); return fallback; }),
       in: vi.fn((_column: string, values: string[]) => {
         if (_column === 'renewal_id') calls.fallback.push(values);
         return _column === 'status' ? Promise.resolve({ data: [], error: null }) : fallback;
@@ -60,7 +61,7 @@ function installBuilders() {
 
 beforeEach(() => {
   from.mockReset(); rpc.mockReset();
-  calls.documents.length = calls.documentFilters.length = calls.documentOrders.length = calls.quotes.length = calls.fallback.length = 0;
+  calls.documents.length = calls.documentFilters.length = calls.documentOrders.length = calls.quotes.length = calls.fallback.length = calls.fallbackSelects.length = 0;
   installBuilders();
   rpc.mockResolvedValue({ data: [], error: null });
 });
@@ -89,6 +90,11 @@ describe('useAoRenewalEvidence', () => {
       ['uploaded_at', { ascending: false }],
     ]);
     expect(calls.quotes.map((ids) => ids.length)).toEqual([50, 1]);
+    expect(calls.fallback.map((ids) => ids.length)).toEqual([50, 2]);
+    expect(calls.fallbackSelects).toEqual([
+      'id, renewal_id, status',
+      'id, renewal_id, status',
+    ]);
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(rpc.mock.calls.map(([, args]) => args.p_account_ids.length)).toEqual([50, 1]);
     expect(result.current.data).toBeInstanceOf(Map);
@@ -96,7 +102,7 @@ describe('useAoRenewalEvidence', () => {
     expect(result.current.data?.get('r-0')?.renewalId).toBe('r-0');
   });
 
-  it('chunks only unlinked renewal fallback reads and does no account query', async () => {
+  it('chunks AO quote reads for unlinked renewals and does no account query', async () => {
     const renewals = Array.from({ length: 51 }, (_, index) => makeRenewal(`u-${index}`, null));
     const { result } = renderHook(() => useAoRenewalEvidence(renewals), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -140,6 +146,7 @@ describe('useAoRenewalEvidence', () => {
     expect(result.current.isLoading).toBe(true);
     await waitFor(() => expect(calls.documents).toEqual([['new-account']]));
     expect(calls.quotes).toEqual([['new-account']]);
+    expect(calls.fallback).toEqual([['same-id'], ['same-id']]);
     expect(rpc).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(result.current.data?.get('same-id')?.accountId).toBe('new-account'));
     expect(result.current.isLoading).toBe(false);
