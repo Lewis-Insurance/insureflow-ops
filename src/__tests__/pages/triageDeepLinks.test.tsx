@@ -172,7 +172,7 @@ describe('triage deep-links from ?cohort=', () => {
     );
 
     await waitFor(() => {
-      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'mine');
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'mine', false);
     });
   });
 
@@ -186,7 +186,7 @@ describe('triage deep-links from ?cohort=', () => {
     );
 
     await waitFor(() => {
-      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', 'mine');
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', 'mine', false);
     });
   });
 
@@ -200,7 +200,7 @@ describe('triage deep-links from ?cohort=', () => {
     );
 
     await waitFor(() => {
-      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', 'mine');
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', 'mine', false);
     });
   });
 
@@ -214,7 +214,21 @@ describe('triage deep-links from ?cohort=', () => {
     );
 
     await waitFor(() => {
-      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'unclaimed');
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'unclaimed', false);
+    });
+  });
+
+  it('TasksPage filters the existing queue to renewal radar tasks', async () => {
+    const fetchTasks = stubSearchHook(useTaskSearch, 'fetchTasks');
+
+    render(
+      <MemoryRouter initialEntries={['/tasks?radar=true']}>
+        <TasksPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'mine', true);
     });
   });
 

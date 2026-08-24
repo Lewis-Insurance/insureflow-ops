@@ -13,10 +13,17 @@
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import {
+  RADAR_SOURCE_TYPE,
+  type RadarComplianceReceipt,
+  normalizePhone,
+  validateRadarComplianceReceipt,
+} from '../_shared/radarCompliance.ts';
 
 interface QueueItem {
   id: string;
   org_id: string;
+  agency_workspace_id: string | null;
   channel: 'email' | 'sms';
   classification: string;
   from_user_id: string;
@@ -36,6 +43,7 @@ interface QueueItem {
   status: string;
   attempts: number;
   max_attempts: number;
+  compliance_check_id: string | null;
 }
 
 interface QueuePayload {
@@ -73,6 +81,15 @@ const DEFAULT_CONFIG: GovernorConfig = {
 // Generate unique processor ID
 const PROCESSOR_ID = `governor-${crypto.randomUUID().slice(0, 8)}`;
 
+function constantTimeEqual(provided: string, expected: string): boolean {
+  const maxLength = Math.max(provided.length, expected.length);
+  let difference = provided.length ^ expected.length;
+  for (let index = 0; index < maxLength; index++) {
+    difference |= (provided.charCodeAt(index) || 0) ^ (expected.charCodeAt(index) || 0);
+  }
+  return difference === 0;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   const corsResponse = handleCors(req);
@@ -102,7 +119,7 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    if (!cronSecret || cronSecret !== expectedSecret) {
+    if (!cronSecret || !constantTimeEqual(cronSecret, expectedSecret)) {
       console.error('Unauthorized: Invalid or missing CRON_SECRET');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -126,14 +143,14 @@ Deno.serve(async (req) => {
     const isPaused = await checkGlobalPause(supabase);
     if (isPaused) {
       console.log('⏸️ Marketing sends are globally paused');
-      return jsonResponse({ success: true, paused: true, message: 'Marketing sends paused' });
+      return jsonResponse({ success: true, paused: true, message: 'Marketing sends paused' }, 200, corsHeaders);
     }
 
     // 3. Check external service health
     const servicesHealthy = await checkServiceHealth(supabase);
     if (!servicesHealthy) {
       console.log('🔴 External services unhealthy, skipping batch');
-      return jsonResponse({ success: false, error: 'External services unhealthy' });
+      return jsonResponse({ success: false, error: 'External services unhealthy' }, 200, corsHeaders);
     }
 
     // 4. Reclaim orphaned claims (from crashed processors)
@@ -143,7 +160,7 @@ Deno.serve(async (req) => {
     const claimedItems = await claimQueueItems(supabase, config.batch_size);
     if (claimedItems.length === 0) {
       console.log('📭 No items to process');
-      return jsonResponse({ success: true, message: 'No items to process', stats });
+      return jsonResponse({ success: true, message: 'No items to process', stats }, 200, corsHeaders);
     }
 
     console.log(`📬 Claimed ${claimedItems.length} items for processing`);
@@ -155,6 +172,11 @@ Deno.serve(async (req) => {
     for (const item of claimedItems) {
       try {
         stats.processed++;
+        if (item.status !== 'claimed') {
+          console.log(`🛡️ Queue claim was suppressed by provenance guard for ${item.id}`);
+          stats.suppressed++;
+          continue;
+        }
         const payload = payloads.find(p => p.queue_id === item.id);
 
         if (!payload) {
@@ -162,6 +184,19 @@ Deno.serve(async (req) => {
           await markFailed(supabase, item.id, 'No payload found');
           stats.failed++;
           continue;
+        }
+
+        // Radar pre-leads are deny-by-default. Keep this immediately before the
+        // mutable suppression/cap checks and provider boundary; legacy marketing
+        // sources retain their existing contract.
+        if (item.source_type === RADAR_SOURCE_TYPE) {
+          const guardFailure = await checkRadarGuard(supabase, item);
+          if (guardFailure) {
+            console.log(`🛡️ Radar Guard blocked item ${item.id}: ${guardFailure}`);
+            await markSuppressed(supabase, item.id, guardFailure);
+            stats.suppressed++;
+            continue;
+          }
         }
 
         // Check preference version (detect stale)
@@ -206,6 +241,25 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        if (item.source_type === RADAR_SOURCE_TYPE) {
+          const reservationFailure = await reserveRadarAttempt(supabase, item);
+          if (reservationFailure) {
+            await markSuppressed(supabase, item.id, reservationFailure);
+            stats.suppressed++;
+            continue;
+          }
+        }
+
+        // Move out of the reclaimable `claimed` state before crossing the
+        // provider boundary. A crash from here requires manual reconciliation,
+        // never an automatic duplicate send.
+        const dispatching = await markProviderDispatching(supabase, item.id);
+        if (!dispatching) {
+          await markFailed(supabase, item.id, 'Unable to establish provider dispatch state', false);
+          stats.failed++;
+          continue;
+        }
+
         // Send the message
         let result: { success: boolean; messageId?: string; error?: string };
 
@@ -216,25 +270,25 @@ Deno.serve(async (req) => {
         }
 
         if (result.success) {
-          // Create evidence record
-          const evidenceId = await createEvidence(supabase, item, payload, result.messageId);
-
-          // Update queue item
-          await markSent(supabase, item.id, result.messageId, evidenceId);
-
-          // Update frequency tracking
-          if (item.to_contact_id) {
-            await updateFrequencyTracking(supabase, item.org_id, item.to_contact_id, item.channel);
+          try {
+            const evidenceId = await createEvidence(supabase, item, payload, result.messageId);
+            await markSent(supabase, item.id, result.messageId, evidenceId);
+            if (item.to_contact_id) {
+              await updateFrequencyTracking(supabase, item.org_id, item.to_contact_id, item.channel);
+            }
+            stats.sent++;
+            console.log(`✅ Sent ${item.channel} to ${item.to_email || item.to_phone}`);
+          } catch (persistenceError) {
+            console.error(`Provider accepted ${item.id}, but evidence persistence failed`, persistenceError);
+            await markDeliveryUnknown(supabase, item.id, result.messageId);
+            stats.failed++;
           }
-
-          stats.sent++;
-          console.log(`✅ Sent ${item.channel} to ${item.to_email || item.to_phone}`);
         } else {
           // Handle failure
           if (item.attempts + 1 >= item.max_attempts) {
-            await markFailed(supabase, item.id, result.error || 'Unknown error');
+            await markFailed(supabase, item.id, result.error || 'Unknown error', item.source_type !== RADAR_SOURCE_TYPE);
           } else {
-            await markForRetry(supabase, item.id, result.error || 'Unknown error');
+            await markForRetry(supabase, item.id, result.error || 'Unknown error', item.source_type !== RADAR_SOURCE_TYPE);
           }
           stats.failed++;
           console.log(`❌ Failed to send ${item.channel}: ${result.error}`);
@@ -254,20 +308,21 @@ Deno.serve(async (req) => {
       processor_id: PROCESSOR_ID,
       duration_ms: duration,
       stats,
-    });
+    }, 200, corsHeaders);
 
   } catch (error) {
     console.error('❌ Fatal governor error:', error);
     return jsonResponse(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      500
+      500,
+      corsHeaders,
     );
   }
 });
 
 // Helper functions
 
-function jsonResponse(data: object, status = 200) {
+function jsonResponse(data: object, status: number, corsHeaders: Record<string, string>) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -352,33 +407,7 @@ async function claimQueueItems(supabase: SupabaseClient, batchSize: number): Pro
   });
 
   if (error) {
-    // Fallback to direct query if RPC doesn't exist
-    console.log('⚠️ RPC not found, using fallback claim method');
-
-    const { data: items, error: selectError } = await supabase
-      .from('marketing_send_queue')
-      .select('*')
-      .eq('status', 'pending')
-      .lte('scheduled_for', now.toISOString())
-      .order('priority', { ascending: true })
-      .order('scheduled_for', { ascending: true })
-      .limit(batchSize);
-
-    if (selectError || !items) return [];
-
-    // Claim them
-    const ids = items.map(i => i.id);
-    await supabase
-      .from('marketing_send_queue')
-      .update({
-        status: 'claimed',
-        processor_id: PROCESSOR_ID,
-        claimed_at: now.toISOString(),
-        claim_expires_at: expiresAt.toISOString(),
-      })
-      .in('id', ids);
-
-    return items as QueueItem[];
+    throw new Error(`Atomic marketing queue claim failed: ${error.message}`);
   }
 
   return data || [];
@@ -465,6 +494,71 @@ async function checkSuppressionRules(supabase: SupabaseClient, item: QueueItem):
   return null;
 }
 
+async function checkRadarGuard(supabase: SupabaseClient, item: QueueItem): Promise<string | null> {
+  if (!item.compliance_check_id) return 'radar_guard_missing';
+
+  const { data: receipt, error: receiptError } = await supabase
+    .from('compliance_checks')
+    .select('*')
+    .eq('id', item.compliance_check_id)
+    .maybeSingle();
+  if (receiptError) return 'radar_guard_lookup_failed';
+
+  const { data: config, error: configError } = await supabase
+    .from('radar_config')
+    .select('sms_enabled')
+    .eq('agency_workspace_id', item.agency_workspace_id)
+    .maybeSingle();
+  if (configError) return 'radar_config_lookup_failed';
+
+  const receiptFailure = validateRadarComplianceReceipt(
+    item,
+    receipt as RadarComplianceReceipt | null,
+    config?.sms_enabled === true,
+  );
+  if (receiptFailure) return receiptFailure;
+
+  // Recheck opt-out at the provider boundary. A receipt may remain fresh for
+  // seven days, but an intervening opt-out must suppress every channel.
+  const { data: legacyMaps, error: legacyMapError } = await supabase
+    .from('agency_workspace_legacy_org_map').select('legacy_org_id')
+    .eq('agency_workspace_id', receipt.agency_workspace_id);
+  const legacyOrgIds = (legacyMaps || []).map((row) => row.legacy_org_id);
+  if (legacyMapError || !legacyOrgIds.length) return 'radar_consent_namespace_missing';
+  const consentResults = await Promise.all(['all', 'email', 'sms', 'mail', 'phone'].map((channel) => {
+    let query = supabase.from('consent_ledger').select('action')
+      .in('org_id', legacyOrgIds).eq('channel', channel)
+      .order('recorded_at', { ascending: false }).limit(1);
+    if (item.to_contact_id) query = query.eq('contact_id', item.to_contact_id);
+    else if (channel === 'email') query = query.eq('email', receipt.destination);
+    else query = query.eq('phone', receipt.dnc_phone);
+    return query.maybeSingle();
+  }));
+  if (!item.to_contact_id && item.channel === 'email') {
+    consentResults.push(await supabase.from('consent_ledger').select('action')
+      .in('org_id', legacyOrgIds).eq('channel', 'all').eq('email', receipt.destination)
+      .order('recorded_at', { ascending: false }).limit(1).maybeSingle());
+  }
+  if (consentResults.some(({ error }) => !!error)) return 'radar_opt_out_lookup_failed';
+  if (consentResults.some(({ data }) => data?.action === 'opt_out')) return 'radar_all_channel_opt_out';
+
+  return null;
+}
+
+async function reserveRadarAttempt(supabase: SupabaseClient, item: QueueItem): Promise<string | null> {
+  const { data: receipt, error: receiptError } = await supabase.from('compliance_checks')
+    .select('dnc_phone').eq('id', item.compliance_check_id).single();
+  if (receiptError || !receipt?.dnc_phone) return 'radar_attempt_phone_missing';
+  const normalizedPhone = normalizePhone(receipt.dnc_phone);
+  const { data, error } = await supabase.rpc('reserve_radar_send_attempt', {
+    p_queue_id: item.id,
+    p_compliance_check_id: item.compliance_check_id,
+    p_normalized_phone: normalizedPhone,
+  });
+  if (error) return 'radar_attempt_reservation_failed';
+  return data?.allowed === true ? null : `radar_${data?.reason || 'attempt_reservation_failed'}`;
+}
+
 async function sendEmail(item: QueueItem, payload: QueuePayload): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const provider = Deno.env.get('EMAIL_PROVIDER') || 'postmark';
   const apiKey = Deno.env.get('EMAIL_PROVIDER_API_KEY');
@@ -505,6 +599,7 @@ async function sendEmail(item: QueueItem, payload: QueuePayload): Promise<{ succ
       }
 
       const result = await response.json();
+      if (!result.MessageID) return { success: false, error: 'Postmark response missing message id' };
       return { success: true, messageId: result.MessageID };
 
     } else if (provider === 'sendgrid') {
@@ -568,7 +663,7 @@ async function sendSms(item: QueueItem, payload: QueuePayload): Promise<{ succes
 
     const result = await response.json();
 
-    if (result.error_code) {
+    if (!response.ok || result.error_code || !result.sid) {
       return { success: false, error: `Twilio error ${result.error_code}: ${result.error_message}` };
     }
 
@@ -584,6 +679,14 @@ async function createEvidence(
   payload: QueuePayload,
   providerMessageId?: string
 ): Promise<string> {
+  const { data: compliance, error: complianceError } = item.compliance_check_id ? await supabase
+    .from('compliance_checks')
+    .select('license_number')
+    .eq('id', item.compliance_check_id)
+    .maybeSingle() : { data: null, error: null };
+  if (item.source_type === RADAR_SOURCE_TYPE && (complianceError || !compliance?.license_number)) {
+    throw new Error('Radar compliance evidence is unavailable');
+  }
   const { data: senderProfile } = await supabase
     .from('profiles')
     .select('email, display_name')
@@ -591,8 +694,8 @@ async function createEvidence(
     .maybeSingle();
 
   const { data: contactData } = item.to_contact_id ? await supabase
-    .from('contacts')
-    .select('first_name, last_name')
+    .from('accounts')
+    .select('name')
     .eq('id', item.to_contact_id)
     .maybeSingle() : { data: null };
 
@@ -609,7 +712,7 @@ async function createEvidence(
       to_account_id: item.to_account_id,
       to_email: item.to_email,
       to_phone: item.to_phone,
-      to_name: contactData ? `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim() : null,
+      to_name: contactData?.name || null,
       subject: payload.email_subject,
       body_html: payload.email_body_html,
       body_text: payload.email_body_text || payload.sms_message,
@@ -621,6 +724,8 @@ async function createEvidence(
       automation_enrollment_id: item.automation_enrollment_id,
       provider_message_id: providerMessageId,
       included_unsubscribe: !!payload.unsubscribe_url,
+      compliance_check_id: item.compliance_check_id,
+      license_number: compliance?.license_number || null,
     })
     .select('id')
     .single();
@@ -631,12 +736,13 @@ async function createEvidence(
   }
 
   // Create initial event
-  await supabase.from('communication_events').insert({
+  const { error: eventError } = await supabase.from('communication_events').insert({
     org_id: item.org_id,
     evidence_id: evidence.id,
     event_type: 'sent',
     event_data: { provider_message_id: providerMessageId },
   });
+  if (eventError) throw eventError;
 
   return evidence.id;
 }
@@ -655,7 +761,7 @@ async function updateFrequencyTracking(supabase: SupabaseClient, orgId: string, 
 }
 
 async function markSent(supabase: SupabaseClient, queueId: string, providerMessageId?: string, evidenceId?: string) {
-  await supabase
+  const { data, error } = await supabase
     .from('marketing_send_queue')
     .update({
       status: 'sent',
@@ -664,23 +770,29 @@ async function markSent(supabase: SupabaseClient, queueId: string, providerMessa
       communication_evidence_id: evidenceId,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', queueId);
+    .eq('id', queueId)
+    .eq('status', 'processing')
+    .select('id')
+    .maybeSingle();
+  if (error || !data) throw error || new Error('Queue item left provider dispatch state');
 }
 
-async function markFailed(supabase: SupabaseClient, queueId: string, error: string) {
+async function markFailed(supabase: SupabaseClient, queueId: string, error: string, incrementAttempt = true) {
+  const { data: current } = await supabase.from('marketing_send_queue')
+    .select('attempts').eq('id', queueId).maybeSingle();
   await supabase
     .from('marketing_send_queue')
     .update({
       status: 'failed',
       last_error: error,
       last_attempt_at: new Date().toISOString(),
-      attempts: supabase.rpc('increment', { row_id: queueId, column_name: 'attempts' }).catch(() => undefined),
+      attempts: (current?.attempts || 0) + (incrementAttempt ? 1 : 0),
       updated_at: new Date().toISOString(),
     })
     .eq('id', queueId);
 }
 
-async function markForRetry(supabase: SupabaseClient, queueId: string, error: string) {
+async function markForRetry(supabase: SupabaseClient, queueId: string, error: string, incrementAttempt = true) {
   const retryDelay = 5 * 60 * 1000; // 5 minutes
   const nextRetry = new Date(Date.now() + retryDelay);
 
@@ -709,9 +821,29 @@ async function markForRetry(supabase: SupabaseClient, queueId: string, error: st
   if (data) {
     await supabase
       .from('marketing_send_queue')
-      .update({ attempts: (data.attempts || 0) + 1 })
+      .update({ attempts: (data.attempts || 0) + (incrementAttempt ? 1 : 0) })
       .eq('id', queueId);
   }
+}
+
+async function markProviderDispatching(supabase: SupabaseClient, queueId: string): Promise<boolean> {
+  const { data, error } = await supabase.from('marketing_send_queue')
+    .update({ status: 'processing', updated_at: new Date().toISOString() })
+    .eq('id', queueId)
+    .eq('status', 'claimed')
+    .select('id')
+    .maybeSingle();
+  return !error && !!data;
+}
+
+async function markDeliveryUnknown(supabase: SupabaseClient, queueId: string, providerMessageId?: string) {
+  const { error } = await supabase.from('marketing_send_queue').update({
+    status: 'delivery_unknown',
+    provider_message_id: providerMessageId,
+    last_error: 'Provider accepted message; delivery evidence persistence is incomplete. Manual reconciliation required.',
+    updated_at: new Date().toISOString(),
+  }).eq('id', queueId).eq('status', 'processing');
+  if (error) console.error('Unable to stamp delivery-unknown state; row remains non-reclaimable processing', error);
 }
 
 async function markSuppressed(supabase: SupabaseClient, queueId: string, reason: string) {

@@ -222,7 +222,7 @@ describe('TasksPage scope and assignee', () => {
     await user.click(screen.getByRole('button', { name: 'Unclaimed' }));
 
     await waitFor(() => {
-      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'unclaimed');
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'unclaimed', false);
     });
   });
 

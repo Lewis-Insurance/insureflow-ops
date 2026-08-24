@@ -60,6 +60,44 @@ interface StepExecution {
   processor_id: string | null;
 }
 
+interface RadarQueueProvenance {
+  source_type: 'wc_renewal_radar';
+  source_id: string;
+  agency_workspace_id: string;
+  radar_lead_id: string;
+  compliance_check_id: string;
+}
+
+async function resolveRadarQueueProvenance(
+  supabase: SupabaseClient,
+  enrollment: AutomationEnrollment,
+): Promise<RadarQueueProvenance | 'guard_required' | null> {
+  if (!enrollment.contact_id) return null;
+  const { data: leads, error: leadError } = await supabase.from('leads')
+    .select('id, agency_workspace_id')
+    .eq('account_id', enrollment.contact_id);
+  if (leadError) throw leadError;
+  if (!leads?.length) return null;
+  const { data: opportunity, error: opportunityError } = await supabase.from('renewal_opportunities')
+    .select('id, agency_workspace_id, lead_id')
+    .eq('stage', 'handed_off')
+    .in('lead_id', leads.map((lead) => lead.id))
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (opportunityError) throw opportunityError;
+  if (!opportunity) return null;
+  const complianceCheckId = enrollment.context_data?.radar_compliance_check_id;
+  if (typeof complianceCheckId !== 'string' || !complianceCheckId) return 'guard_required';
+  return {
+    source_type: 'wc_renewal_radar',
+    source_id: opportunity.id,
+    agency_workspace_id: opportunity.agency_workspace_id,
+    radar_lead_id: opportunity.lead_id,
+    compliance_check_id: complianceCheckId,
+  };
+}
+
 const PROCESSOR_ID = `automation-${crypto.randomUUID().slice(0, 8)}`;
 const BATCH_SIZE = 100;
 const CLAIM_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -356,13 +394,18 @@ async function executeSendEmail(
     subject?: string;
     body_html?: string;
   };
+  const radar = await resolveRadarQueueProvenance(supabase, enrollment);
+  if (radar === 'guard_required') {
+    return { action: 'send_email', skipped: true, reason: 'Radar compliance check required for this touch' };
+  }
 
   // Get contact email
-  const { data: contact } = await supabase
-    .from('contacts')
-    .select('email, first_name, last_name')
-    .eq('id', enrollment.contact_id)
-    .single();
+  const [{ data: account }, { data: insuredEmail }] = await Promise.all([
+    supabase.from('accounts').select('name').eq('id', enrollment.contact_id).maybeSingle(),
+    supabase.from('insured_emails').select('email').eq('account_id', enrollment.contact_id)
+      .order('is_primary', { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const contact = insuredEmail ? { email: insuredEmail.email, first_name: account?.name || '', last_name: '' } : null;
 
   if (!contact?.email) {
     return { action: 'send_email', skipped: true, reason: 'No email address' };
@@ -408,8 +451,11 @@ async function executeSendEmail(
       to_contact_id: enrollment.contact_id,
       to_account_id: enrollment.account_id,
       to_email: contact.email,
-      source_type: 'automation',
-      source_id: enrollment.recipe_id,
+      source_type: radar?.source_type || 'automation',
+      source_id: radar?.source_id || enrollment.recipe_id,
+      agency_workspace_id: radar?.agency_workspace_id || null,
+      radar_lead_id: radar?.radar_lead_id || null,
+      compliance_check_id: radar?.compliance_check_id || null,
       automation_step_id: step.id,
       automation_enrollment_id: enrollment.id,
     })
@@ -447,14 +493,19 @@ async function executeSendSms(
     template_id?: string;
     message?: string;
   };
+  const radar = await resolveRadarQueueProvenance(supabase, enrollment);
+  if (radar === 'guard_required') {
+    return { action: 'send_sms', skipped: true, reason: 'Radar compliance check required for this touch' };
+  }
 
   // Get contact phone
-  const { data: contact } = await supabase
-    .from('contacts')
-    .select('phone, mobile_phone, first_name, last_name')
-    .eq('id', enrollment.contact_id)
-    .single();
-
+  const [{ data: account }, { data: insuredPhone }] = await Promise.all([
+    supabase.from('accounts').select('name').eq('id', enrollment.contact_id).maybeSingle(),
+    supabase.from('insured_phones').select('e164').eq('account_id', enrollment.contact_id)
+      .order('is_primary', { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const contact = insuredPhone ? { phone: insuredPhone.e164, mobile_phone: insuredPhone.e164,
+    first_name: account?.name || '', last_name: '' } : null;
   const phone = contact?.mobile_phone || contact?.phone;
   if (!phone) {
     return { action: 'send_sms', skipped: true, reason: 'No phone number' };
@@ -497,8 +548,11 @@ async function executeSendSms(
       to_contact_id: enrollment.contact_id,
       to_account_id: enrollment.account_id,
       to_phone: phone,
-      source_type: 'automation',
-      source_id: enrollment.recipe_id,
+      source_type: radar?.source_type || 'automation',
+      source_id: radar?.source_id || enrollment.recipe_id,
+      agency_workspace_id: radar?.agency_workspace_id || null,
+      radar_lead_id: radar?.radar_lead_id || null,
+      compliance_check_id: radar?.compliance_check_id || null,
       automation_step_id: step.id,
       automation_enrollment_id: enrollment.id,
     })

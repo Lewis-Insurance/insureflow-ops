@@ -25,6 +25,7 @@ interface Lead {
   lead_score: number;
   insurance_types: string[];
   account_id: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 Deno.serve(async (req) => {
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
         // Build lead query based on trigger conditions
         let leadQuery = supabase
           .from('leads')
-          .select('id, status, lead_score, insurance_types, account_id')
+          .select('id, status, lead_score, insurance_types, account_id, metadata')
           .eq('account_id', campaign.account_id);
 
         const conditions = campaign.trigger_conditions || {};
