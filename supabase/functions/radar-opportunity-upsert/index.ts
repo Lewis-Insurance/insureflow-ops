@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { verifyAgencyAuth } from "../_shared/agency-auth.ts";
-import { dedupKey, normalizeEntity, type RadarRow } from "../_shared/radarIngest.ts";
+import { classCodeAllowed, dedupKey, normalizeEntity, type RadarRow } from "../_shared/radarIngest.ts";
 import { radarOwnBookKeys } from "../_shared/radarOwnBook.ts";
 
 const reply = (body: unknown, status: number, headers: Record<string, string>) =>
@@ -62,7 +62,7 @@ serve(async (req) => {
         else if (ownPolicies.has(policyCarrier) && policyCarrier !== ":") exclusion = "own_client";
         else if (row.fein && ownEntities.has(employerFein)) exclusion = "own_client";
         else if (/LEWIS/i.test(staged.agency_of_record ?? "")) exclusion = "lewis_aor";
-        else if (allowlist.size && !allowlist.has(String(staged.class_code ?? "").replace(/\D/g, ""))) exclusion = "class";
+        else if (allowlist.size && !classCodeAllowed(staged.class_code, allowlist)) exclusion = "class";
         const opportunity = {
           agency_workspace_id: agencyWorkspaceId, employer_name: staged.employer_name, fein: staged.fein, county: staged.county,
           policy_number: staged.policy_number, carrier: staged.carrier, expiration_date: staged.expiration_date,

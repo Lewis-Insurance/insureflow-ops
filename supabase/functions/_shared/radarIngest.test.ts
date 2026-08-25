@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { canonicalizeRow, dedupKey, parseCsv, sourceRowHash, validateRow } from "./radarIngest.ts";
+import { canonicalizeRow, classCodeAllowed, dedupKey, parseCsv, sourceRowHash, validateRow } from "./radarIngest.ts";
 
 Deno.test("CSV parser preserves quoted commas and escaped quotes", () => {
   assertEquals(parseCsv('Employer,County\r\n"Acme, Inc.",Lee\r\n"A ""Good"" Co",Collier\r\n'), [
@@ -44,4 +44,28 @@ Deno.test("source row hashes are deterministic and kind-sensitive", async () => 
   const row = { employer_name: "Acme", policy_number: "WC1", carrier: "Carrier" };
   assertEquals(await sourceRowHash("cancel", row), await sourceRowHash("cancel", { ...row }));
   assertEquals((await sourceRowHash("cancel", row)) === (await sourceRowHash("swo", row)), false);
+  assertEquals((await sourceRowHash("cancel", row)) ===
+    (await sourceRowHash("cancel", { ...row, policy_number: "WC2" })), false);
+});
+
+Deno.test("same employer name never merges distinct source identities", async () => {
+  const first = await sourceRowHash("cancel", {
+    employer_name: "Same Name LLC", policy_number: "WC-100", carrier: "Carrier A",
+  });
+  const second = await sourceRowHash("cancel", {
+    employer_name: "Same Name LLC", policy_number: "WC-200", carrier: "Carrier B",
+  });
+  assertEquals(first === second, false);
+});
+
+Deno.test("locked class filter allows 28 codes and excludes 8810 and 8742", () => {
+  const allowed = [
+    "5551", "5190", "5183", "5537", "5474", "0042", "5478", "5445", "5022", "5403", "5645", "5606",
+    "9014", "0917", "8835", "8829", "8824", "8869", "9082", "9083", "9084", "9052", "8006", "8017",
+    "8380", "8393", "9015", "8292",
+  ];
+  assertEquals(allowed.length, 28);
+  for (const code of allowed) assertEquals(classCodeAllowed(code, allowed), true);
+  assertEquals(classCodeAllowed("8810", allowed), false);
+  assertEquals(classCodeAllowed("8742", allowed), false);
 });
