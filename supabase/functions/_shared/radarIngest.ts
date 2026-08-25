@@ -101,6 +101,11 @@ export async function sourceRowHash(kind: RadarKind, row: RadarRow): Promise<str
   return sha256Hex(stable);
 }
 
+export function classCodeAllowed(classCode: unknown, allowlist: Iterable<string>): boolean {
+  const normalized = String(classCode ?? "").replace(/\D/g, "");
+  return new Set([...allowlist].map((code) => String(code).replace(/\D/g, ""))).has(normalized);
+}
+
 export function validateRawRow(row: Record<string, unknown>): void {
   const entries = Object.entries(row);
   if (entries.length > 100) throw new Error("A row exceeds the 100-column limit");

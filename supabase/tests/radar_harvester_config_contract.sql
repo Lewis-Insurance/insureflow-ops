@@ -70,6 +70,19 @@ DO $$ BEGIN
 EXCEPTION WHEN insufficient_privilege THEN NULL; END $$;
 SELECT public.configure_radar('20000000-0000-0000-0000-000000000001',
   ARRAY['5551','5190','5183','5537','5474','0042','5478','5445','5022','5403','5645','5606','9014','0917','8835','8829','8824','8869','9082','9083','9084','9052','8006','8017','8380','8393','9015','8292']);
+SELECT public.configure_radar(
+  p_workspace_id => '20000000-0000-0000-0000-000000000001',
+  p_class_allowlist => ARRAY['5551','5190','5183','5537','5474','0042','5478','5445','5022','5403','5645','5606','9014','0917','8835','8829','8824','8869','9082','9083','9084','9052','8006','8017','8380','8393','9015','8292'],
+  p_cancel_source_url => 'https://poc.example.invalid/cancel');
+-- A legacy four-argument caller must not erase the collector URL.
+SELECT public.configure_radar('20000000-0000-0000-0000-000000000001',
+  ARRAY['5551','5190','5183','5537','5474','0042','5478','5445','5022','5403','5645','5606','9014','0917','8835','8829','8824','8869','9082','9083','9084','9052','8006','8017','8380','8393','9015','8292']);
+DO $$ BEGIN
+  IF (SELECT cancel_source_url FROM public.radar_config
+      WHERE agency_workspace_id='20000000-0000-0000-0000-000000000001')<>'https://poc.example.invalid/cancel' THEN
+    RAISE EXCEPTION 'legacy configure_radar erased cancel_source_url';
+  END IF;
+END $$;
 RESET ROLE;
 
 INSERT INTO public.tasks(title,description,category,source,entity_type,metadata,dedupe_key,priority,status,completed_at,deleted_at)
@@ -79,6 +92,7 @@ VALUES('forged','forged','general','manual','account','{"agency_workspace_id":"3
 SET LOCAL ROLE service_role;
 SELECT set_config('request.jwt.claim.role','service_role',true);
 SELECT public.radar_record_swo_miss('20000000-0000-0000-0000-000000000001','2024-01-02','contract miss');
+SELECT public.radar_record_cancel_miss('20000000-0000-0000-0000-000000000001','2024-01-02','empty Columbia slice');
 RESET ROLE;
 
 DO $$
@@ -90,9 +104,17 @@ BEGIN
       AND t.account_id IS NULL AND t.customer_id IS NULL AND t.assignee_id IS NULL) THEN
     RAISE EXCEPTION 'adversarial preseed was not safely canonicalized/mapped';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.tasks t JOIN public.radar_alert_tasks rat ON rat.task_id=t.id
+    WHERE rat.agency_workspace_id='20000000-0000-0000-0000-000000000001' AND rat.alert_date='2024-01-02'
+      AND rat.alert_kind='cancel_miss' AND t.title='Cancellation radar pull missed: 2024-01-02'
+      AND t.source='wc_renewal_radar' AND t.category::text='renewal' AND t.priority::text='high'
+      AND t.status::text='pending' AND t.completed_at IS NULL AND t.deleted_at IS NULL
+      AND t.account_id IS NULL AND t.customer_id IS NULL AND t.assignee_id IS NULL) THEN
+    RAISE EXCEPTION 'cancel miss was not mapped to the durable renewal alert product';
+  END IF;
   IF (SELECT count(*) FROM public.push_notification_queue q
-      WHERE q.agency_workspace_id='20000000-0000-0000-0000-000000000001' AND q.source_type='task')<>2 THEN
-    RAISE EXCEPTION 'Landen and Lewi push notifications were not queued';
+      WHERE q.agency_workspace_id='20000000-0000-0000-0000-000000000001' AND q.source_type='task')<>4 THEN
+    RAISE EXCEPTION 'Landen and Lewi push notifications were not queued for both radar misses';
   END IF;
   IF has_table_privilege('authenticated','public.radar_alert_tasks','INSERT')
     OR has_table_privilege('authenticated','public.radar_alert_tasks','UPDATE') THEN
