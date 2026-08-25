@@ -27,6 +27,8 @@ import { useAORenewal, useUpdateAORenewal, useUpdateAORenewalStatus, useSetAORen
 import { useProfiles } from '@/hooks/useProfiles';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
+import { AddPolicyModal, type AddPolicyAfterSaveContext } from '@/components/customers/AddPolicyModal';
+import { buildAoMovedPrefill, buildAoMovedUpdates } from '@/components/renewals/aoMovedPolicy';
 import { TerminalStatusModal, type TerminalStatusData, type TerminalStatusType } from '@/components/renewals/TerminalStatusModal';
 import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
@@ -140,13 +142,16 @@ export default function AORenewalEdit() {
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [workspaceTab, setWorkspaceTab] = useState('contact');
+  // Editing already-captured move details (carrier / term / premium). This never
+  // writes a policy, so it keeps the small editor.
   const [showMovedModal, setShowMovedModal] = useState(false);
+  // Moving the file to "Moved" for the first time: record the replacement policy.
+  const [showMovedPolicyModal, setShowMovedPolicyModal] = useState(false);
   const [showTerminalModal, setShowTerminalModal] = useState(false);
   const [pendingTerminalStatus, setPendingTerminalStatus] = useState<'lost' | 'cancelled' | null>(null);
   const [terminalModalLoading, setTerminalModalLoading] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
-  const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState({ date: '', reason: '' });
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [showMarkDoneDialog, setShowMarkDoneDialog] = useState(false);
@@ -248,12 +253,10 @@ export default function AORenewalEdit() {
       moved_term: data.term,
       moved_premium: data.premium.toString(),
     }));
-    setPendingMovedStatus(false);
     setShowMovedModal(false);
   };
 
   const handleMovedCancel = () => {
-    setPendingMovedStatus(false);
     setShowMovedModal(false);
   };
 
@@ -261,8 +264,10 @@ export default function AORenewalEdit() {
   const handleTopStatusChange = (newStatus: AORenewalStatus) => {
     if (!id) return;
     if (newStatus === 'moved' && formData.status !== 'moved') {
-      setPendingMovedStatus(true);
-      setShowMovedModal(true);
+      // Moving away means there is a real replacement policy to record, so the
+      // standard Add New Policy popup opens. The dropdown stays on the current
+      // status until that policy is actually saved.
+      setShowMovedPolicyModal(true);
       return;
     }
     if (newStatus === 'lost' || newStatus === 'cancelled') {
@@ -284,46 +289,42 @@ export default function AORenewalEdit() {
     );
   };
 
-  const handleTopMovedConfirm = (data: { carrier: string; term: AORenewalTerm; premium: number }) => {
-    if (!id) return;
-    updateMutation.mutate(
-      {
-        id,
-        updates: {
-          status: 'moved',
-          moved_carrier: data.carrier,
-          moved_term: data.term,
-          moved_premium: data.premium,
-          follow_up_date: null,
-          follow_up_reason: null,
-        },
-      },
-      {
-        onSuccess: () => {
-          setFormData((prev) => ({
+  /**
+   * Runs only after the replacement policy row exists. Throwing leaves the Add
+   * New Policy popup open with a retry, so the renewal is never left un-moved
+   * behind a closed modal.
+   */
+  const handleMovedAfterSave = async ({ accountId, form }: AddPolicyAfterSaveContext) => {
+    // Never resolve without writing: a silent success would close the popup on
+    // a renewal that is still sitting in its old status.
+    if (!id) throw new Error('No renewal id');
+    const updates = buildAoMovedUpdates(form, accountId);
+    await updateMutation.mutateAsync({ id, updates });
+
+    const movedTerm = updates.moved_term ?? '';
+    const movedPremium = updates.moved_premium?.toString() ?? '';
+    setFormData((prev) => ({
+      ...prev,
+      status: 'moved',
+      moved_carrier: updates.moved_carrier,
+      moved_term: movedTerm,
+      moved_premium: movedPremium,
+      follow_up_date: '',
+      follow_up_reason: '',
+    }));
+    setCleanBaseline((prev) =>
+      prev
+        ? {
             ...prev,
             status: 'moved',
-            moved_carrier: data.carrier,
-            moved_term: data.term,
-            moved_premium: data.premium.toString(),
-            follow_up_date: '',
-            follow_up_reason: '',
-          }));
-          setCleanBaseline((prev) =>
-            prev ? { ...prev, status: 'moved', moved_carrier: data.carrier, moved_term: data.term, moved_premium: data.premium.toString() } : prev,
-          );
-          setFollowUpDraft({ date: '', reason: '' });
-          setPendingMovedStatus(false);
-          setShowMovedModal(false);
-          toast({ title: 'Status updated', description: 'Renewal marked as moved' });
-        },
-        onError: () => {
-          setPendingMovedStatus(false);
-          setShowMovedModal(false);
-          toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' });
-        },
-      },
+            moved_carrier: updates.moved_carrier,
+            moved_term: movedTerm,
+            moved_premium: movedPremium,
+          }
+        : prev,
     );
+    setFollowUpDraft({ date: '', reason: '' });
+    toast({ title: 'Status updated', description: 'Renewal marked as moved' });
   };
 
   const handleTerminalConfirm = (data: TerminalStatusData) => {
@@ -1290,11 +1291,27 @@ export default function AORenewalEdit() {
           </AlertDialogContent>
         </AlertDialog>
         <AddAORenewalTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} renewal={renewal} />
-        {/* Moved modal — used by both the top status dropdown and the in-form "edit moved details" button */}
+        {/* Status changed to Moved: record the replacement policy on a CRM
+            customer. Saving the policy is what marks this renewal Moved. */}
+        {showMovedPolicyModal && (
+          <AddPolicyModal
+            open={showMovedPolicyModal}
+            onOpenChange={setShowMovedPolicyModal}
+            enableCustomerSearch
+            customerSearchQuery={formData.customer_name}
+            title="Add New Policy"
+            description={`Record the policy ${formData.customer_name || 'this customer'} moved to. Saving also marks this renewal Moved.`}
+            submitLabel="Add Policy and Mark Moved"
+            initialValues={buildAoMovedPrefill(renewal)}
+            onAfterSave={handleMovedAfterSave}
+            afterSaveErrorMessage="The policy was saved but the renewal was not marked Moved."
+          />
+        )}
+        {/* Edits the already-captured move details. It never writes a policy. */}
         <MovedStatusModal
           open={showMovedModal}
           onOpenChange={(open) => { if (!open) handleMovedCancel(); }}
-          onConfirm={pendingMovedStatus ? handleTopMovedConfirm : handleMovedConfirm}
+          onConfirm={handleMovedConfirm}
           customerName={formData.customer_name}
         />
         {/* Terminal status (lost / cancelled) */}

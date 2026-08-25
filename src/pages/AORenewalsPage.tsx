@@ -18,7 +18,8 @@ import {
   Upload,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { MovedStatusModal } from "@/components/renewals/MovedStatusModal";
+import { AddPolicyModal, type AddPolicyAfterSaveContext } from "@/components/customers/AddPolicyModal";
+import { buildAoMovedPrefill, buildAoMovedUpdates } from "@/components/renewals/aoMovedPolicy";
 import { TerminalStatusModal, type TerminalStatusData, type TerminalStatusType } from "@/components/renewals/TerminalStatusModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,6 @@ import {
   type AORenewal,
   type AORenewalOperationalMetrics,
   type AORenewalStatus,
-  type AORenewalTerm,
 } from "@/hooks/useAORenewals";
 import { supabase } from "@/integrations/supabase/client";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
@@ -363,20 +363,22 @@ export default function AORenewalsPage() {
     );
   };
 
-  const handleMovedConfirm = (data: { carrier: string; term: AORenewalTerm; premium: number }) => {
-    if (!movedModalRenewal) return;
-    updateRenewalMutation.mutate({
+  /**
+   * Runs only after the replacement policy row exists. Throwing here keeps the
+   * Add New Policy popup open with a retry, so a failed write never leaves the
+   * renewal silently un-moved.
+   */
+  const handleMovedAfterSave = async ({
+    accountId,
+    form,
+  }: AddPolicyAfterSaveContext) => {
+    // Never resolve without writing: a silent success would close the popup on
+    // a renewal that is still sitting in its old status.
+    if (!movedModalRenewal) throw new Error('No renewal selected');
+    await updateRenewalMutation.mutateAsync({
       id: movedModalRenewal.id,
-      updates: {
-        status: 'moved',
-        moved_carrier: data.carrier,
-        moved_term: data.term,
-        moved_premium: data.premium,
-        follow_up_date: null,
-        follow_up_reason: null,
-      },
+      updates: buildAoMovedUpdates(form, accountId),
     });
-    setMovedModalRenewal(null);
   };
 
   const handleDelete = () => {
@@ -715,12 +717,24 @@ export default function AORenewalsPage() {
           renewal={taskRenewal}
         />
       )}
-      <MovedStatusModal
-        open={!!movedModalRenewal}
-        onOpenChange={(open) => !open && setMovedModalRenewal(null)}
-        onConfirm={handleMovedConfirm}
-        customerName={movedModalRenewal?.customer_name}
-      />
+      {/* Moved means the policy went to another carrier, so we record the real
+          replacement policy in the standard Add New Policy popup. AO renewals
+          are not linked to a CRM account, hence the customer search. */}
+      {movedModalRenewal && (
+        <AddPolicyModal
+          open={!!movedModalRenewal}
+          onOpenChange={(open) => !open && setMovedModalRenewal(null)}
+          enableCustomerSearch
+          customerSearchQuery={movedModalRenewal.customer_name}
+          title="Add New Policy"
+          description={`Record the policy ${movedModalRenewal.customer_name} moved to. Saving also marks this renewal Moved.`}
+          submitLabel="Add Policy and Mark Moved"
+          initialValues={buildAoMovedPrefill(movedModalRenewal)}
+          onAfterSave={handleMovedAfterSave}
+          afterSaveErrorMessage="The policy was saved but the renewal was not marked Moved."
+          onSuccess={() => setMovedModalRenewal(null)}
+        />
+      )}
       {terminalModalStatus && (
         <TerminalStatusModal
           open={!!terminalModalRenewal}
