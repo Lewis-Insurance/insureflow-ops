@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuotes } from '@/hooks/useQuotes';
 import { useRenewals } from '@/hooks/useRenewals';
 import { useTasks } from '@/hooks/useTasks';
+import { useCommandCenterCounts } from '@/hooks/useCommandCenterCounts';
 import { 
   AlertTriangle, 
   Clock, 
@@ -40,6 +41,7 @@ export default function CommandCenterPage() {
   const { data: quotes, isLoading: quotesLoading } = useQuotes();
   const { data: renewals, isLoading: renewalsLoading } = useRenewals('upcoming');
   const { tasks, loading: tasksLoading } = useTasks();
+  const { data: counts } = useCommandCenterCounts();
 
   // Calculate critical metrics
   const criticalQuotes = quotes?.filter(q => {
@@ -212,7 +214,7 @@ export default function CommandCenterPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-destructive">
-                {escalations.length}
+                {counts?.escalations ?? 0}
               </div>
               <p className="text-xs text-muted-foreground">
                 Require immediate action
@@ -227,10 +229,10 @@ export default function CommandCenterPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {quotes?.filter(q => q.status === 'open').length || 0}
+                {counts?.openQuotes ?? 0}
               </div>
               <p className="text-xs text-muted-foreground">
-                {criticalQuotes.length} over 24hrs
+                {counts?.criticalQuotes ?? 0} over 24hrs
               </p>
             </CardContent>
           </Card>
@@ -242,10 +244,10 @@ export default function CommandCenterPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {renewals?.length || 0}
+                {counts?.upcomingRenewals ?? 0}
               </div>
               <p className="text-xs text-muted-foreground">
-                {criticalRenewals.length} urgent (≤7 days)
+                {counts?.urgentRenewals ?? 0} urgent (≤7 days)
               </p>
             </CardContent>
           </Card>
@@ -257,10 +259,10 @@ export default function CommandCenterPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {tasks?.filter(t => t.status !== 'completed').length || 0}
+                {counts?.activeTasks ?? 0}
               </div>
               <p className="text-xs text-muted-foreground">
-                {criticalTasks.length} overdue
+                {counts?.overdueTasks ?? 0} overdue
               </p>
             </CardContent>
           </Card>
