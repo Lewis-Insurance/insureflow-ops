@@ -77,6 +77,75 @@ export interface PipelineHealth {
   conversionRate: number;
 }
 
+interface LeadQueryFilters {
+  producerId?: string;
+  start?: string;
+  end?: string;
+  status?: string;
+}
+
+const PIPELINE_STAGES = ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost', 'nurturing'] as const;
+
+function applyLeadFilters<T extends {
+  is: (column: string, value: null) => T;
+  eq: (column: string, value: string) => T;
+  gte: (column: string, value: string) => T;
+  lte: (column: string, value: string) => T;
+}>(query: T, filters: LeadQueryFilters): T {
+  let filtered = query.is('deleted_at', null);
+  if (filters.producerId) filtered = filtered.eq('assigned_to', filters.producerId);
+  if (filters.start) filtered = filtered.gte('created_at', filters.start);
+  if (filters.end) filtered = filtered.lte('created_at', filters.end);
+  if (filters.status) filtered = filtered.eq('status', filters.status);
+  return filtered;
+}
+
+async function countLeads(filters: LeadQueryFilters = {}): Promise<number> {
+  const query = applyLeadFilters(
+    supabase.from('leads').select('id', { count: 'exact', head: true }),
+    filters,
+  );
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function sumLeadPremium(filters: LeadQueryFilters = {}): Promise<number> {
+  const query = applyLeadFilters(
+    supabase.from('leads').select('current_premium.sum()'),
+    filters,
+  );
+  const { data, error } = await query;
+  if (error) throw error;
+  const sum = data?.[0]?.sum;
+  return sum != null ? Number(sum) : 0;
+}
+
+async function getPeriodMetrics(
+  start: Date,
+  end: Date,
+  producerId?: string,
+) {
+  const period = { producerId, start: start.toISOString(), end: end.toISOString() };
+  const [newLeads, contacted, qualified, quoted, won, revenue] = await Promise.all([
+    countLeads(period),
+    countLeads({ ...period, status: 'contacted' }),
+    countLeads({ ...period, status: 'qualified' }),
+    countLeads({ ...period, status: 'quoted' }),
+    countLeads({ ...period, status: 'won' }),
+    sumLeadPremium({ ...period, status: 'won' }),
+  ]);
+  return {
+    newLeads,
+    contacted,
+    qualified,
+    quoted,
+    won,
+    revenue,
+    conversionRate: newLeads > 0 ? (won / newLeads) * 100 : 0,
+  };
+}
+
 /**
  * Get dashboard metrics for a specific producer or agency-wide
  */
@@ -103,79 +172,26 @@ export function useDashboardMetrics(producerId?: string) {
       const quarterStart = new Date(today.getFullYear(), quarter * 3, 1);
       const quarterEnd = new Date(today.getFullYear(), quarter * 3 + 3, 0, 23, 59, 59, 999);
 
-      // Build query with optional producer filter
-      let leadsQuery = supabase
-        .from('leads')
-        .select('*')
-        .is('deleted_at', null); // Exclude soft-deleted leads
-
-      if (producerId) {
-        leadsQuery = leadsQuery.eq('assigned_to', producerId);
-      }
-
-      // Fetch all leads
-      const { data: allLeads, error: allError } = await leadsQuery;
-      if (allError) throw allError;
-
-      // Fetch MTD leads
-      let mtdQuery = supabase
-        .from('leads')
-        .select('*')
-        .is('deleted_at', null) // Exclude soft-deleted leads
-        .gte('created_at', monthStart.toISOString())
-        .lte('created_at', monthEnd.toISOString());
-
-      if (producerId) {
-        mtdQuery = mtdQuery.eq('assigned_to', producerId);
-      }
-
-      const { data: mtdLeads, error: mtdError } = await mtdQuery;
-      if (mtdError) throw mtdError;
-
-      // Fetch today's leads
-      let todayQuery = supabase
-        .from('leads')
-        .select('*')
-        .is('deleted_at', null) // Exclude soft-deleted leads
-        .gte('created_at', dayStart.toISOString())
-        .lte('created_at', dayEnd.toISOString());
-
-      if (producerId) {
-        todayQuery = todayQuery.eq('assigned_to', producerId);
-      }
-
-      const { data: todayLeads, error: todayError } = await todayQuery;
-      if (todayError) throw todayError;
-
-      // Fetch this week's leads
-      let weekQuery = supabase
-        .from('leads')
-        .select('*')
-        .is('deleted_at', null) // Exclude soft-deleted leads
-        .gte('created_at', weekStart.toISOString())
-        .lte('created_at', weekEnd.toISOString());
-
-      if (producerId) {
-        weekQuery = weekQuery.eq('assigned_to', producerId);
-      }
-
-      const { data: weekLeads, error: weekError } = await weekQuery;
-      if (weekError) throw weekError;
-
-      // Fetch this quarter's leads
-      let quarterQuery = supabase
-        .from('leads')
-        .select('*')
-        .is('deleted_at', null) // Exclude soft-deleted leads
-        .gte('created_at', quarterStart.toISOString())
-        .lte('created_at', quarterEnd.toISOString());
-
-      if (producerId) {
-        quarterQuery = quarterQuery.eq('assigned_to', producerId);
-      }
-
-      const { data: quarterLeads, error: quarterError } = await quarterQuery;
-      if (quarterError) throw quarterError;
+      const pipelineCountsPromise = Promise.all(
+        PIPELINE_STAGES.map((status) => countLeads({ producerId, status })),
+      );
+      const [mtdStats, weekStats, quarterStats, todayCounts, pipelineCounts, totalValue] = await Promise.all([
+        getPeriodMetrics(monthStart, monthEnd, producerId),
+        getPeriodMetrics(weekStart, weekEnd, producerId),
+        getPeriodMetrics(quarterStart, quarterEnd, producerId),
+        Promise.all(
+          ['new', 'contacted', 'qualified', 'quoted', 'won'].map((status) =>
+            countLeads({
+              producerId,
+              start: dayStart.toISOString(),
+              end: dayEnd.toISOString(),
+              status,
+            }),
+          ),
+        ),
+        pipelineCountsPromise,
+        sumLeadPremium({ producerId }),
+      ]);
 
       // Fetch producer goals (if individual dashboard)
       let dailyGoal = 5; // Default goal
@@ -201,56 +217,15 @@ export function useDashboardMetrics(producerId?: string) {
 
       // Calculate metrics
       const todayStats = {
-        newLeads: todayLeads?.filter(l => l.status === 'new').length || 0,
-        contacted: todayLeads?.filter(l => l.status === 'contacted').length || 0,
-        qualified: todayLeads?.filter(l => l.status === 'qualified').length || 0,
-        quoted: todayLeads?.filter(l => l.status === 'quoted').length || 0,
-        won: todayLeads?.filter(l => l.status === 'won').length || 0,
+        newLeads: todayCounts[0],
+        contacted: todayCounts[1],
+        qualified: todayCounts[2],
+        quoted: todayCounts[3],
+        won: todayCounts[4],
         goalTarget: dailyGoal,
         goalProgress: 0,
       };
       todayStats.goalProgress = (todayStats.won / dailyGoal) * 100;
-
-      const mtdStats = {
-        newLeads: mtdLeads?.length || 0,
-        contacted: mtdLeads?.filter(l => l.status === 'contacted').length || 0,
-        qualified: mtdLeads?.filter(l => l.status === 'qualified').length || 0,
-        quoted: mtdLeads?.filter(l => l.status === 'quoted').length || 0,
-        won: mtdLeads?.filter(l => l.status === 'won').length || 0,
-        revenue: mtdLeads?.filter(l => l.status === 'won').reduce((sum, l) => sum + (l.current_premium || 0), 0) || 0,
-        conversionRate: 0,
-      };
-      mtdStats.conversionRate = mtdStats.newLeads > 0 
-        ? (mtdStats.won / mtdStats.newLeads) * 100 
-        : 0;
-
-      // Calculate this week's stats
-      const weekStats = {
-        newLeads: weekLeads?.length || 0,
-        contacted: weekLeads?.filter(l => l.status === 'contacted').length || 0,
-        qualified: weekLeads?.filter(l => l.status === 'qualified').length || 0,
-        quoted: weekLeads?.filter(l => l.status === 'quoted').length || 0,
-        won: weekLeads?.filter(l => l.status === 'won').length || 0,
-        revenue: weekLeads?.filter(l => l.status === 'won').reduce((sum, l) => sum + (l.current_premium || 0), 0) || 0,
-        conversionRate: 0,
-      };
-      weekStats.conversionRate = weekStats.newLeads > 0 
-        ? (weekStats.won / weekStats.newLeads) * 100 
-        : 0;
-
-      // Calculate this quarter's stats
-      const quarterStats = {
-        newLeads: quarterLeads?.length || 0,
-        contacted: quarterLeads?.filter(l => l.status === 'contacted').length || 0,
-        qualified: quarterLeads?.filter(l => l.status === 'qualified').length || 0,
-        quoted: quarterLeads?.filter(l => l.status === 'quoted').length || 0,
-        won: quarterLeads?.filter(l => l.status === 'won').length || 0,
-        revenue: quarterLeads?.filter(l => l.status === 'won').reduce((sum, l) => sum + (l.current_premium || 0), 0) || 0,
-        conversionRate: 0,
-      };
-      quarterStats.conversionRate = quarterStats.newLeads > 0 
-        ? (quarterStats.won / quarterStats.newLeads) * 100 
-        : 0;
 
       // Calculate trend/projection
       const daysInMonth = endOfMonth(today).getDate();
@@ -270,14 +245,14 @@ export function useDashboardMetrics(producerId?: string) {
 
       // Pipeline distribution
       const pipelineStats = {
-        new: allLeads?.filter(l => l.status === 'new').length || 0,
-        contacted: allLeads?.filter(l => l.status === 'contacted').length || 0,
-        qualified: allLeads?.filter(l => l.status === 'qualified').length || 0,
-        quoted: allLeads?.filter(l => l.status === 'quoted').length || 0,
-        won: allLeads?.filter(l => l.status === 'won').length || 0,
-        lost: allLeads?.filter(l => l.status === 'lost').length || 0,
-        nurturing: allLeads?.filter(l => l.status === 'nurturing').length || 0,
-        totalValue: allLeads?.reduce((sum, l) => sum + (l.current_premium || 0), 0) || 0,
+        new: pipelineCounts[0],
+        contacted: pipelineCounts[1],
+        qualified: pipelineCounts[2],
+        quoted: pipelineCounts[3],
+        won: pipelineCounts[4],
+        lost: pipelineCounts[5],
+        nurturing: pipelineCounts[6],
+        totalValue,
       };
 
       const metrics: DashboardMetrics = {
@@ -316,17 +291,16 @@ export function useProducerLeaderboard() {
       const leaderboard: ProducerLeaderboard[] = [];
 
       for (const producer of producers || []) {
-        const { data: leads } = await supabase
-          .from('leads')
-          .select('*')
-          .is('deleted_at', null) // Exclude soft-deleted leads
-          .eq('assigned_to', producer.id)
-          .gte('created_at', monthStart.toISOString())
-          .lte('created_at', monthEnd.toISOString());
-
-        const totalLeads = leads?.length || 0;
-        const wins = leads?.filter(l => l.status === 'won').length || 0;
-        const revenue = leads?.filter(l => l.status === 'won').reduce((sum, l) => sum + (l.current_premium || 0), 0) || 0;
+        const period = {
+          producerId: producer.id,
+          start: monthStart.toISOString(),
+          end: monthEnd.toISOString(),
+        };
+        const [totalLeads, wins, revenue] = await Promise.all([
+          countLeads(period),
+          countLeads({ ...period, status: 'won' }),
+          sumLeadPremium({ ...period, status: 'won' }),
+        ]);
         const conversionRate = totalLeads > 0 ? (wins / totalLeads) * 100 : 0;
         const avgDealSize = wins > 0 ? revenue / wins : 0;
 
@@ -355,37 +329,13 @@ export function usePipelineHealth() {
   return useQuery({
     queryKey: ['pipeline-health'],
     queryFn: async () => {
-      const { data: leads, error } = await supabase
-        .from('leads')
-        .select('*')
-        .is('deleted_at', null); // Exclude soft-deleted leads
-
-      if (error) throw error;
-
-      const stages = ['new', 'contacted', 'qualified', 'quoted', 'won', 'lost', 'nurturing'];
-      const health: PipelineHealth[] = [];
-
-      for (const stage of stages) {
-        const stageLeads = leads?.filter(l => l.status === stage) || [];
-        const count = stageLeads.length;
-        const value = stageLeads.reduce((sum, l) => sum + (l.current_premium || 0), 0);
-        
-        // Calculate average time in stage (simplified)
-        const avgTimeInStage = 0;
-        
-        // Calculate conversion rate
-        const conversionRate = 0;
-
-        health.push({
-          stage,
-          count,
-          value,
-          avgTimeInStage,
-          conversionRate,
-        });
-      }
-
-      return health;
+      return Promise.all(PIPELINE_STAGES.map(async (stage): Promise<PipelineHealth> => {
+        const [count, value] = await Promise.all([
+          countLeads({ status: stage }),
+          sumLeadPremium({ status: stage }),
+        ]);
+        return { stage, count, value, avgTimeInStage: 0, conversionRate: 0 };
+      }));
     },
     refetchInterval: 300000, // Refresh every 5 minutes
   });
