@@ -21,7 +21,7 @@ const PIPELINE_VALUE_STATUSES = ['qualified', 'quoted', 'nurturing'] as const;
 
 async function countLeads(
   dateRange?: { start: string; end: string },
-  status?: string
+  status?: string | readonly string[]
 ): Promise<number> {
   let query = supabase
     .from('leads')
@@ -34,7 +34,9 @@ async function countLeads(
       .lte('created_at', dateRange.end);
   }
 
-  if (status) {
+  if (Array.isArray(status)) {
+    query = query.in('status', [...status]);
+  } else if (status) {
     query = query.eq('status', status);
   }
 
@@ -143,36 +145,24 @@ export function useConversionFunnel(dateRange?: { start: string; end: string }) 
   return useQuery({
     queryKey: ['conversion-funnel', dateRange],
     queryFn: async () => {
-      let query = supabase
-        .from('leads')
-        .select('status, created_at')
-        .is('deleted_at', null); // Exclude soft-deleted leads
+      let total: number;
+      let contacted: number;
+      let qualified: number;
+      let quoted: number;
+      let won: number;
 
-      if (dateRange) {
-        query = query
-          .gte('created_at', dateRange.start)
-          .lte('created_at', dateRange.end);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
+      try {
+        [total, contacted, qualified, quoted, won] = await Promise.all([
+          countLeads(dateRange),
+          countLeads(dateRange, ['contacted', 'qualified', 'quoted', 'nurturing', 'won']),
+          countLeads(dateRange, ['qualified', 'quoted', 'nurturing', 'won']),
+          countLeads(dateRange, ['quoted', 'nurturing', 'won']),
+          countLeads(dateRange, 'won'),
+        ]);
+      } catch (error) {
         logger.error('Error fetching funnel data:', error);
         throw error;
       }
-
-      // Calculate funnel stages
-      const total = data.length;
-      const contacted = data.filter(l => 
-        ['contacted', 'qualified', 'quoted', 'nurturing', 'won'].includes(l.status)
-      ).length;
-      const qualified = data.filter(l => 
-        ['qualified', 'quoted', 'nurturing', 'won'].includes(l.status)
-      ).length;
-      const quoted = data.filter(l => 
-        ['quoted', 'nurturing', 'won'].includes(l.status)
-      ).length;
-      const won = data.filter(l => l.status === 'won').length;
 
       return [
         { 
