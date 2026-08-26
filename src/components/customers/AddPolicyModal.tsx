@@ -1,10 +1,12 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DuplicatePolicyDialog, type ExistingPolicyInfo } from './DuplicatePolicyDialog';
+import { CustomerSearchSelect, type CustomerSearchResult } from './CustomerSearchSelect';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import {
   PolicyFormFields,
   policySchema,
@@ -16,16 +18,29 @@ import {
 } from './PolicyFormFields';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeForILike } from '@/lib/sanitize';
+import { mapLineOfBusiness } from '@/lib/policyParserMap';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { generateTasks } from '@/lib/taskAutomation';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
 
+/** Context handed to `onAfterSave` once the policy row exists. */
+export interface AddPolicyAfterSaveContext {
+  accountId: string;
+  policyId: string;
+  /** The form values as they were when Add Policy was pressed. */
+  form: PolicyFormData;
+}
+
 interface AddPolicyModalProps {
   open: boolean;
+  /**
+   * Required unless `enableCustomerSearch` is on, in which case the customer is
+   * chosen inside the modal.
+   */
+  accountId?: string;
   onOpenChange: (open: boolean) => void;
-  accountId: string;
   onSuccess?: () => void;
   /**
    * Customer record pages only: when a policy number is already in use, show a
@@ -35,6 +50,31 @@ interface AddPolicyModalProps {
   enableDuplicateMerge?: boolean;
   /** Name of the customer whose record we're on (left panel + merge context). */
   currentCustomerName?: string;
+  /**
+   * Surfaces that are not already scoped to a customer (AO renewals) turn this
+   * on to pick the account the policy lands on before saving.
+   */
+  enableCustomerSearch?: boolean;
+  /** Seeds the customer search box, e.g. the name on the AO renewal row. */
+  customerSearchQuery?: string;
+  /** Optional copy overrides so the caller can explain why the popup is open. */
+  title?: string;
+  description?: string;
+  submitLabel?: string;
+  /**
+   * Seeds the policy form when the modal opens. Applied once per open, after
+   * the line-of-business lookup resolves so the value can be canonicalized.
+   */
+  initialValues?: Partial<PolicyFormData>;
+  /**
+   * Runs after the policy row is inserted and before the modal closes. Throw to
+   * report a failed follow-on write: the modal keeps the policy, stays open, and
+   * offers a Retry that replays this callback with the values captured at the
+   * moment of failure.
+   */
+  onAfterSave?: (context: AddPolicyAfterSaveContext) => Promise<void>;
+  /** Banner text shown when `onAfterSave` fails. */
+  afterSaveErrorMessage?: string;
 }
 
 export function AddPolicyModal({
@@ -44,6 +84,14 @@ export function AddPolicyModal({
   onSuccess,
   enableDuplicateMerge = false,
   currentCustomerName,
+  enableCustomerSearch = false,
+  customerSearchQuery,
+  title = 'Add New Policy',
+  description,
+  submitLabel = 'Add Policy',
+  initialValues,
+  onAfterSave,
+  afterSaveErrorMessage = 'The policy was saved but the follow-up update did not go through.',
 }: AddPolicyModalProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<PolicyFormData>(initialPolicyFormData);
@@ -61,18 +109,96 @@ export function AddPolicyModal({
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateLoading, setDuplicateLoading] = useState(false);
   const [duplicateExisting, setDuplicateExisting] = useState<ExistingPolicyInfo | null>(null);
+  // Customer search mode (AO renewals): the account is picked inside the modal.
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
+  const [customerError, setCustomerError] = useState<string>('');
+  // While the search list is open it owns the Escape key, so the modal stays put.
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  // Set when the policy insert succeeded but `onAfterSave` failed. Holds the
+  // values as they were at the moment of failure so Retry replays exactly that
+  // write, never whatever the form happens to show later.
+  const [failedAfterSave, setFailedAfterSave] = useState<AddPolicyAfterSaveContext | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prefillAppliedRef = useRef(false);
   const { toast } = useToast();
 
   // Fetch carriers and lines of business
   const { data: carriers = [], isLoading: carriersLoading } = useCarriers();
   const { data: linesOfBusiness = [], isLoading: lobLoading } = useLinesOfBusiness();
 
+  const resolvedAccountId = enableCustomerSearch ? selectedCustomer?.id ?? '' : accountId ?? '';
+  const resolvedCustomerName = enableCustomerSearch
+    ? selectedCustomer?.name ?? ''
+    : currentCustomerName ?? '';
+
+  const resetForm = useCallback(() => {
+    setFormData(initialPolicyFormData);
+    setUploadedFile(null);
+    setUploadedFilePath(null);
+    setParseStatus('idle');
+    setErrors({});
+    setNeedsConfirmation({});
+    setSelectedCustomer(null);
+    setCustomerError('');
+    setCustomerSearchOpen(false);
+    setFailedAfterSave(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
+  // Seeded surfaces (AO Moved) start from a clean, prefilled form every time the
+  // popup opens. Plain customer pages keep their existing draft-preserving
+  // behavior, so nothing changes for them.
+  const isSeededSurface = enableCustomerSearch || !!initialValues;
+  useEffect(() => {
+    if (!open) {
+      prefillAppliedRef.current = false;
+      return;
+    }
+    if (!isSeededSurface || prefillAppliedRef.current) return;
+    // Wait for the line-of-business lookup so a seeded value can be matched
+    // against the canonical list instead of saved as free text.
+    if (lobLoading) return;
+
+    prefillAppliedRef.current = true;
+    resetForm();
+
+    if (!initialValues) return;
+
+    let seeded: PolicyFormData = { ...initialPolicyFormData };
+    const seededConfirmation: Record<string, boolean> = {};
+
+    for (const [field, value] of Object.entries(initialValues)) {
+      if (!value) continue;
+      if (field === 'line_of_business') {
+        const match = mapLineOfBusiness({ line_of_business: value }, linesOfBusiness);
+        if (match.value) {
+          seeded = applyPolicyFieldChange(seeded, field, match.value);
+        } else {
+          // Do not guess a non-canonical line of business, ask for it.
+          seededConfirmation.line_of_business = true;
+        }
+        continue;
+      }
+      seeded = applyPolicyFieldChange(seeded, field, value);
+    }
+
+    setFormData(seeded);
+    setNeedsConfirmation(seededConfirmation);
+  }, [open, isSeededSurface, initialValues, lobLoading, linesOfBusiness, resetForm]);
+
   const validateForm = () => {
+    let valid = true;
+
+    if (enableCustomerSearch && !selectedCustomer) {
+      setCustomerError('Choose the customer this policy belongs to.');
+      valid = false;
+    } else {
+      setCustomerError('');
+    }
+
     try {
       policySchema.parse(formData);
       setErrors({});
-      return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
         const newErrors: Record<string, string> = {};
@@ -83,8 +209,10 @@ export function AddPolicyModal({
         });
         setErrors(newErrors);
       }
-      return false;
+      valid = false;
     }
+
+    return valid;
   };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -157,7 +285,7 @@ export function AddPolicyModal({
             document_url: publicUrlData.publicUrl,
             document_id: documentId,
             file_name: file.name,
-            account_id: accountId,
+            account_id: resolvedAccountId || null,
             user_id: user?.id || null,
           },
         });
@@ -206,7 +334,7 @@ export function AddPolicyModal({
     if (files.length > 0) {
       processFile(files[0]);
     }
-  }, [formData, accountId]);
+  }, [formData, resolvedAccountId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -281,6 +409,11 @@ export function AddPolicyModal({
   async function handleSave() {
     if (!validateForm()) return;
 
+    // Snapshot the values this save is committing. Everything below reads the
+    // snapshot, so a later edit to the live form cannot change what a retry writes.
+    const savedForm: PolicyFormData = { ...formData };
+    const savedAccountId = resolvedAccountId;
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -293,7 +426,7 @@ export function AddPolicyModal({
         return;
       }
 
-      const policyData = buildPolicyInsert(formData, accountId, user.id);
+      const policyData = buildPolicyInsert(savedForm, savedAccountId, user.id);
 
       const { data: newPolicy, error } = await supabase
         .from('policies')
@@ -323,7 +456,7 @@ export function AddPolicyModal({
       if (uploadedFile && uploadedFilePath && newPolicy) {
         try {
           const documentRecord = {
-            account_id: accountId,
+            account_id: savedAccountId,
             policy_id: newPolicy.id,
             name: uploadedFile.name, // Display name shown in UI
             filename: uploadedFile.name,
@@ -352,9 +485,37 @@ export function AddPolicyModal({
         }
       }
 
-      // Auto-generate tasks for new policy
+      // Auto-generate tasks for new policy. Best effort: the policy is already
+      // saved, so a task-automation hiccup must not look like a failed save or
+      // block the caller's follow-on write below.
       if (newPolicy) {
-        await generateTasks('policy_issued', accountId, 'policy', newPolicy.id);
+        try {
+          await generateTasks('policy_issued', savedAccountId, 'policy', newPolicy.id);
+        } catch (taskError) {
+          console.error('Failed to generate policy tasks:', taskError);
+        }
+      }
+
+      // Follow-on write owned by the caller (AO Moved marks the renewal). The
+      // policy already exists at this point, so a failure here must never
+      // re-run the insert: we hold the snapshot and offer a targeted retry.
+      if (onAfterSave && newPolicy) {
+        const context: AddPolicyAfterSaveContext = {
+          accountId: savedAccountId,
+          policyId: newPolicy.id,
+          form: savedForm,
+        };
+        try {
+          await onAfterSave(context);
+        } catch (afterSaveError) {
+          setFailedAfterSave(context);
+          toast({
+            title: 'Policy saved, follow-up failed',
+            description: afterSaveErrorMessage,
+            variant: 'destructive',
+          });
+          return;
+        }
       }
 
       toast({
@@ -364,13 +525,7 @@ export function AddPolicyModal({
           : 'Policy added successfully',
       });
 
-      // Reset form
-      setFormData(initialPolicyFormData);
-      setUploadedFile(null);
-      setUploadedFilePath(null);
-      setParseStatus('idle');
-      setErrors({});
-      setNeedsConfirmation({});
+      resetForm();
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -382,6 +537,48 @@ export function AddPolicyModal({
     } finally {
       setLoading(false);
     }
+  }
+
+  /**
+   * Replay only the follow-on write, using the snapshot taken when it failed.
+   * The policy row is already in place, so nothing here touches the form.
+   */
+  async function handleRetryAfterSave() {
+    if (!failedAfterSave || !onAfterSave) return;
+
+    setLoading(true);
+    try {
+      await onAfterSave(failedAfterSave);
+      setFailedAfterSave(null);
+      toast({ title: 'Success', description: 'Follow-up update saved' });
+      resetForm();
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (error) {
+      toast({
+        title: 'Still not saved',
+        description: afterSaveErrorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Closing after a failed follow-up still leaves a real policy behind, so the
+   * caller has to refresh even though its own write did not land.
+   */
+  function handleClose() {
+    const policySaved = !!failedAfterSave;
+    // Customer pages have always kept an abandoned draft around; only the
+    // seeded surfaces (and a half-completed save) start over.
+    if (isSeededSurface || policySaved) resetForm();
+    setFailedAfterSave(null);
+    setCustomerError('');
+    setCustomerSearchOpen(false);
+    onOpenChange(false);
+    if (policySaved) onSuccess?.();
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -396,12 +593,47 @@ export function AddPolicyModal({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) onOpenChange(true);
+        else handleClose();
+      }}
+    >
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        onEscapeKeyDown={(event) => {
+          // Escape belongs to the customer search list while it is open.
+          if (customerSearchOpen) {
+            event.preventDefault();
+            setCustomerSearchOpen(false);
+          }
+        }}
+      >
         <DialogHeader>
-          <DialogTitle>Add New Policy</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <div className="space-y-4">
+          {enableCustomerSearch && (
+            <div>
+              <Label htmlFor="add-policy-customer">Customer *</Label>
+              <CustomerSearchSelect
+                id="add-policy-customer"
+                value={selectedCustomer}
+                onChange={(customer) => {
+                  setSelectedCustomer(customer);
+                  if (customer) setCustomerError('');
+                }}
+                searchOpen={customerSearchOpen}
+                onSearchOpenChange={setCustomerSearchOpen}
+                initialQuery={customerSearchQuery}
+                error={customerError}
+                disabled={loading || !!failedAfterSave}
+              />
+            </div>
+          )}
+
           {/* Drag and Drop Zone */}
           <Card
             className={`border-2 border-dashed transition-colors cursor-pointer ${
@@ -493,13 +725,34 @@ export function AddPolicyModal({
             lobLoading={lobLoading}
           />
 
+          {failedAfterSave && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">Policy saved, follow-up did not</p>
+                  <p className="text-sm text-muted-foreground">
+                    {afterSaveErrorMessage} Retry sends the same values again. Nothing you change in
+                    the form below will be re-saved.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
+            <Button variant="ghost" onClick={handleClose} disabled={loading}>
+              {failedAfterSave ? 'Close' : 'Cancel'}
             </Button>
-            <Button onClick={handleSave} disabled={loading || parsing} className="bg-green-600 hover:bg-green-700">
-              {loading ? 'Adding...' : 'Add Policy'}
-            </Button>
+            {failedAfterSave ? (
+              <Button onClick={handleRetryAfterSave} disabled={loading}>
+                {loading ? 'Retrying...' : 'Retry'}
+              </Button>
+            ) : (
+              <Button onClick={handleSave} disabled={loading || parsing} className="bg-green-600 hover:bg-green-700">
+                {loading ? 'Adding...' : submitLabel}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
@@ -515,12 +768,12 @@ export function AddPolicyModal({
         line_of_business: formData.line_of_business.trim(),
       }}
       existing={duplicateExisting}
-      currentCustomerName={currentCustomerName ?? ''}
-      currentAccountId={accountId}
+      currentCustomerName={resolvedCustomerName}
+      currentAccountId={resolvedAccountId}
       onMerge={(existingAccountId) => {
         setDuplicateOpen(false);
         onOpenChange(false);
-        navigate(`/merge-customers?masterId=${accountId}&duplicateId=${existingAccountId}`);
+        navigate(`/merge-customers?masterId=${resolvedAccountId}&duplicateId=${existingAccountId}`);
       }}
       onSeePolicy={(policyId) => {
         setDuplicateOpen(false);
