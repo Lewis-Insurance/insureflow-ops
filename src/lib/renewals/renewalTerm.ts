@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { extractLocalDate } from '@/lib/date/localDate';
+import { extractLocalDate, parseLocalDate } from '@/lib/date/localDate';
 
 /**
  * Renewals term helpers — single source of truth for the policy-term vocabulary,
@@ -42,6 +42,27 @@ export function renewalPillStatus(status: string | null | undefined): string {
 /** renewals.moved_term ('6_month'|'annual') -> policies.policy_term ('semiannual'|'annual'). */
 export function movedTermToPolicyTerm(t: MovedTerm | null | undefined): PolicyTerm {
   return t === '6_month' ? 'semiannual' : 'annual';
+}
+
+/**
+ * Term of a policy that is already on file: its own value when set, otherwise read from the date
+ * span. The 200-day cut mirrors renewal_mark_moved, so a replacement policy linked to a Moved
+ * renewal is labeled the same in the widget as it is recorded on the closed renewal.
+ */
+export function termOfExistingPolicy(policy: {
+  policy_term?: string | null;
+  effective_date?: string | null;
+  expiration_date?: string | null;
+}): PolicyTerm {
+  if (policy.policy_term) return normalizePolicyTerm(policy.policy_term);
+  const eff = extractLocalDate(policy.effective_date);
+  const exp = extractLocalDate(policy.expiration_date);
+  // YYYY-MM-DD strings compare lexicographically in date order.
+  if (eff && exp && exp > eff) {
+    const days = (parseLocalDate(exp).getTime() - parseLocalDate(eff).getTime()) / 86_400_000;
+    return days <= 200 ? 'semiannual' : 'annual';
+  }
+  return 'annual';
 }
 
 /** policies.policy_term ('semiannual'|'annual') -> renewals.moved_term ('6_month'|'annual'). */

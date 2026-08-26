@@ -1035,11 +1035,78 @@ export function useMarkRenewed() {
   });
 }
 
+/** Typed outcomes of a blocked Move, so the widget can offer the right next step. */
+export type MovedConflictCode =
+  /** The number entered is still the policy being renewed. */
+  | 'SAME_POLICY_NUMBER'
+  /** A different live policy on THIS customer already owns the number, so it can be linked. */
+  | 'POLICY_ON_ACCOUNT'
+  /** The number belongs to another customer. Nothing to link here. */
+  | 'DUPLICATE_POLICY';
+
+export interface MovedConflictError extends Error {
+  code: MovedConflictCode;
+  /** The policy that owns the number (SAME_POLICY_NUMBER / POLICY_ON_ACCOUNT). */
+  existingPolicyId: string | null;
+  /** The account that owns it, for the deep link. */
+  existingAccountId: string | null;
+}
+
+/** A live policy on the account, offered as the already-on-file replacement for a Move. */
+export interface MovePolicyOption {
+  id: string;
+  policy_number: string;
+  carrier: string | null;
+  line_of_business: string | null;
+  premium: number | null;
+  effective_date: string | null;
+  expiration_date: string | null;
+  policy_term: string | null;
+  status: string | null;
+}
+
 /**
- * Terminal commit: MOVED. Creates a NEW active policy with the moved-to carrier/term/premium
- * (copying durable fields from the old policy), flips the OLD policy to 'inactive' (its data
- * preserved), and closes the renewal as 'moved'. The new policy gets its own 'upcoming'
- * renewal via the policy->renewal sync trigger.
+ * The account's other in-force policies, offered when recording a Move so the agent can point
+ * at a replacement the office already added by hand instead of creating a duplicate.
+ */
+export function useAccountPolicyOptions(
+  accountId: string | null | undefined,
+  excludePolicyId?: string | null,
+) {
+  return useQuery({
+    queryKey: ['account-policy-options', accountId, excludePolicyId ?? null],
+    queryFn: async () => {
+      if (!accountId) return [] as MovePolicyOption[];
+
+      const { data, error } = await supabase
+        .from('policies')
+        .select('id, policy_number, carrier, line_of_business, premium, effective_date, expiration_date, policy_term, status')
+        .eq('account_id', accountId)
+        .is('deleted_at', null) // merge-tombstoned duplicates must never render
+        .in('status', ['active', 'pending'])
+        .order('effective_date', { ascending: false, nullsFirst: false });
+
+      if (error) {
+        logger.error('[useAccountPolicyOptions] Error fetching policies:', error);
+        throw error;
+      }
+
+      return (data as MovePolicyOption[]).filter((p) => p.id !== excludePolicyId);
+    },
+    enabled: !!accountId,
+  });
+}
+
+/**
+ * Terminal commit: MOVED. Two shapes, one transaction:
+ *  - default: creates a NEW active policy with the moved-to carrier/term/premium (copying
+ *    durable fields from the old policy). It gets its own 'upcoming' renewal via the
+ *    policy->renewal sync.
+ *  - `existingPolicyId`: LINKS a policy the office already added by hand as the moved-to
+ *    policy. That policy's data is never edited; the renewal records its carrier, premium,
+ *    term and dates.
+ * Either way the OLD policy is retired (its data preserved, and a terminal status the office
+ * already recorded is kept) and the renewal closes as 'moved'.
  */
 export function useMarkMoved() {
   const queryClient = useQueryClient();
@@ -1056,15 +1123,18 @@ export function useMarkMoved() {
       effective_date: string;
       expiration_date: string;
       notes?: string;
+      /** Link this already-on-file policy as the moved-to policy instead of creating one. */
+      existingPolicyId?: string | null;
     }) => {
       const {
         renewalId, policyId, accountId, carrier, policy_number, premium,
-        policy_term, effective_date, expiration_date, notes,
+        policy_term, effective_date, expiration_date, notes, existingPolicyId,
       } = params;
 
-      // Atomic + idempotent: the new policy INSERT, old policy -> inactive, renewal -> moved,
-      // and the audit note all run in one transaction inside renewal_mark_moved, so a failed or
-      // retried commit can never leave two active policies or duplicate the new policy.
+      // Atomic + idempotent: the new policy (inserted or linked), old policy -> retired,
+      // renewal -> moved, and the audit note all run in one transaction inside
+      // renewal_mark_moved, so a failed or retried commit can never leave two active policies
+      // or duplicate the new policy.
       const { data: newPolicyId, error } = await (supabase as any).rpc('renewal_mark_moved', {
         p_renewal_id: renewalId,
         p_policy_id: policyId,
@@ -1076,39 +1146,62 @@ export function useMarkMoved() {
         p_effective_date: effective_date,
         p_expiration_date: expiration_date,
         p_notes: notes ?? null,
+        p_existing_policy_id: existingPolicyId ?? null,
       });
       if (error) {
-        // The RPC raises a human MESSAGE with the owner account id in DETAIL
-        // ('DUPLICATE_POLICY_NUMBER=<uuid>'); a raw 23505 is the fallback. Any of these becomes a
-        // typed error the widget turns into the friendly "already added" prompt with a deep link.
+        // The RPC classifies a live policy-number collision in DETAIL:
+        //   SAME_AS_CURRENT_POLICY=<policy>      the number is still the expiring policy's
+        //   POLICY_ALREADY_ON_ACCOUNT=<policy>   a live policy on this customer owns it (linkable)
+        //   DUPLICATE_POLICY_NUMBER=<account>    it belongs to another customer
+        // A raw 23505 is the fallback. Each becomes a typed error the widget resolves in place.
         const msg = error.message || '';
         const blob = `${msg} ${(error as any).details || ''}`;
-        const dup = /DUPLICATE_POLICY_NUMBER=([0-9a-fA-F-]*)/.exec(blob);
-        if (dup || (error as any).code === '23505' || /already added/i.test(msg)) {
-          const dupErr: any = new Error(msg || 'This policy is already added for this customer.');
-          dupErr.code = 'DUPLICATE_POLICY';
-          dupErr.existingAccountId = dup?.[1] || null;
-          throw dupErr;
+        const same = /SAME_AS_CURRENT_POLICY=([0-9a-fA-F-]+)/.exec(blob);
+        const onAccount = /POLICY_ALREADY_ON_ACCOUNT=([0-9a-fA-F-]+)/.exec(blob);
+        const owner = /(?:DUPLICATE_POLICY_NUMBER|OWNER_ACCOUNT)=([0-9a-fA-F-]+)/.exec(blob);
+
+        if (same || onAccount || owner || (error as any).code === '23505' || /already added/i.test(msg)) {
+          const conflict = new Error(
+            msg || 'This policy is already added on this customer.',
+          ) as MovedConflictError;
+          conflict.code = same ? 'SAME_POLICY_NUMBER' : onAccount ? 'POLICY_ON_ACCOUNT' : 'DUPLICATE_POLICY';
+          conflict.existingPolicyId = same?.[1] || onAccount?.[1] || null;
+          conflict.existingAccountId = owner?.[1] || null;
+          throw conflict;
         }
         throw new Error(msg || 'Failed to record move');
       }
 
       await bestEffortRetention(policyId);
 
-      return { renewalId, policyId, newPolicyId: newPolicyId as string };
+      return {
+        renewalId,
+        policyId,
+        accountId,
+        newPolicyId: newPolicyId as string,
+        linked: !!existingPolicyId,
+      };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['renewal', data.renewalId] });
       queryClient.invalidateQueries({ queryKey: ['renewals'] });
       queryClient.invalidateQueries({ queryKey: ['policy', data.policyId] });
+      queryClient.invalidateQueries({ queryKey: ['policy', data.newPolicyId] });
       queryClient.invalidateQueries({ queryKey: ['policies'] });
+      queryClient.invalidateQueries({ queryKey: ['account-policy-options', data.accountId] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['policy-renewal-risk-scores'] });
       queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
-      toast.success('Policy moved — new policy created');
+      queryClient.invalidateQueries({ queryKey: ['account-notes', data.accountId] });
+      toast.success(
+        data.linked
+          ? 'Policy moved. Linked to the policy already on file.'
+          : 'Policy moved. New policy created.',
+      );
     },
     onError: (error: any) => {
-      if (error?.code === 'DUPLICATE_POLICY') return; // widget shows a friendly modal instead
+      // The widget resolves every classified conflict in place, so no toast for those.
+      if (error?.code === 'DUPLICATE_POLICY' || error?.code === 'POLICY_ON_ACCOUNT' || error?.code === 'SAME_POLICY_NUMBER') return;
       logger.error('[useMarkMoved] Error:', error);
       toast.error(error.message || 'Failed to record move');
     },
