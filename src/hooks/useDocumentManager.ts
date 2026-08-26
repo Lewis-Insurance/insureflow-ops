@@ -1,8 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { usePermissions } from './usePermissions';
 import { logger } from '@/lib/logger';
+import { uploadCustomerDocument } from '@/lib/documents/uploadCustomerDocument';
 
 export interface DocumentRecord {
   id: string;
@@ -24,39 +26,53 @@ export interface DocumentRecord {
   policy_id?: string;
   pii_level?: string;
   last_checked_at?: string;
+  /** Joined so the list can show which policy a document is filed under. */
+  policy?: {
+    id: string;
+    policy_number: string | null;
+    line_of_business: string | null;
+  } | null;
 }
 
 export function useDocumentManager(accountId?: string) {
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [checking, setChecking] = useState(false);
   const { canManageDocuments } = usePermissions();
+  const queryClient = useQueryClient();
 
-  const fetchDocuments = useCallback(async () => {
-    if (!accountId) return;
-
-    try {
-      setLoading(true);
+  // React Query, not local state, so an upload from anywhere else on the page
+  // (for example the drop control on a policy card) refreshes this list through
+  // the shared ['documents'] invalidation instead of needing a remount.
+  const {
+    data: documents = [],
+    isLoading: loading,
+    error: loadError,
+  } = useQuery({
+    queryKey: ['documents', 'account-manager', accountId],
+    enabled: !!accountId,
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
-        .select('*')
-        .eq('account_id', accountId)
+        .select('*, policy:policies!documents_policy_id_fkey(id, policy_number, line_of_business)')
+        .eq('account_id', accountId!)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setDocuments(data || []);
-    } catch (err: any) {
-      logger.error('Error fetching documents:', err);
-      toast({
-        title: "Error",
-        description: "Failed to fetch documents",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [accountId]);
+      if (error) {
+        // A failed fetch must surface as an error state, never as an empty
+        // document list. This is an E&O trail: "none" and "could not load"
+        // are not the same answer.
+        logger.error('Error fetching documents:', error);
+        throw error;
+      }
+
+      return (data || []) as unknown as DocumentRecord[];
+    },
+  });
+
+  // Refreshes this list and every other documents query on the page in one go.
+  const fetchDocuments = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['documents'], refetchType: 'all' });
+  }, [queryClient]);
 
   const uploadDocument = useCallback(async (
     file: File,
@@ -83,44 +99,14 @@ export function useDocumentManager(accountId?: string) {
     try {
       setUploading(true);
 
-      // Generate unique file path
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `${accountId}/${fileName}`;
-
-      // Upload file to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Create document record
-      const { data: { user } } = await supabase.auth.getUser();
-      const documentData: any = {
-        account_id: accountId,
-        filename: file.name,
+      // Shared upload path: same storage object and same documents row shape as
+      // the Upload Document modal and the policy card drop control.
+      const docRecord = await uploadCustomerDocument({
+        file,
+        accountId,
         kind: 'document',
-        name: file.name,
         category: category || 'other',
-        storage_path: filePath,
-        storage_bucket: 'documents',
-        file_missing: false,
-        mime_type: file.type,
-        size_bytes: file.size,
-        uploaded_by: user?.id
-      };
-
-      const { data: docRecord, error: dbError } = await supabase
-        .from('documents')
-        .insert(documentData)
-        .select('*')
-        .single();
-
-      if (dbError) throw dbError;
+      });
 
       toast({
         title: "Success",
@@ -129,8 +115,8 @@ export function useDocumentManager(accountId?: string) {
 
       // Refresh documents list
       await fetchDocuments();
-      
-      return docRecord;
+
+      return docRecord as unknown as DocumentRecord;
     } catch (err: any) {
       logger.error('Error uploading document:', err);
       toast({
@@ -366,12 +352,6 @@ export function useDocumentManager(accountId?: string) {
     }
   }, [accountId, fetchDocuments]);
 
-  useEffect(() => {
-    if (accountId) {
-      fetchDocuments();
-    }
-  }, [accountId, fetchDocuments]);
-
   const getDocumentUrl = useCallback(async (document: DocumentRecord): Promise<string | null> => {
     return tryGetSignedUrlForDoc(document);
   }, []);
@@ -379,6 +359,8 @@ export function useDocumentManager(accountId?: string) {
   return {
     documents,
     loading,
+    /** Set when the list could not be loaded. Not the same as no documents. */
+    loadError,
     uploading,
     checking,
     uploadDocument,

@@ -19,6 +19,7 @@ import { AddQuoteModal } from './AddQuoteModal';
 import { AddNoteModal } from './AddNoteModal';
 import { AddTaskModal } from './AddTaskModal';
 import { UploadDocModal } from './UploadDocModal';
+import { PolicyDocumentDrop } from './PolicyDocumentDrop';
 import { EditPolicyModal } from './EditPolicyModal';
 import { useEffect, useState } from 'react';
 import { QuoteVsIncumbentComparison } from '@/components/quotes/QuoteVsIncumbentComparison';
@@ -135,9 +136,10 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
 
   // Renders a single policy card. The card is intentionally NOT clickable so the
   // text (policy number, dates) stays selectable for copy/paste. Navigation is an
-  // explicit "View full policy" button. Per-card actions are that button + a
-  // three-dot overflow only. No per-card lime fill: the surface shows many cards
-  // and the one lime fill on this tab is the section-level "New policy" button.
+  // explicit "View full policy" button. Per-card actions are that button, a
+  // three-dot overflow, and a compact add-a-document control. No per-card lime
+  // fill: the surface shows many cards and the one lime fill on this tab is the
+  // section-level "New policy" button.
   const renderPolicyCard = (policy: PolicyWithAccount, variant: 'active' | 'inactive') => {
     const openPolicy = () => navigate(`/policies/${policy.id}`);
     const isActive = variant === 'active';
@@ -292,6 +294,15 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Drop a file here, or click to pick one. The policy is already known,
+              so it uploads straight away with documents.policy_id set and shows
+              up in the Documents panel below carrying its Policy # chip. */}
+          <PolicyDocumentDrop
+            accountId={accountId}
+            policyId={policy.id}
+            policyLabel={policy.policy_number}
+          />
         </div>
 
         {/* Coverage line: muted summary or nothing. Never a raw object. */}
