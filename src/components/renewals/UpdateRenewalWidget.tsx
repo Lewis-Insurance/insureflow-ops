@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   type Renewal,
+  type MovePolicyOption,
+  type MovedConflictCode,
   useSaveRenewalDraft,
   useMarkRenewed,
   useMarkMoved,
@@ -25,6 +27,7 @@ import {
   useRenewalDocuments,
   useUploadRenewalDocument,
   useDeleteRenewalDocument,
+  useAccountPolicyOptions,
 } from '@/hooks/useRenewalWorkflow';
 import {
   deriveExpiration,
@@ -32,13 +35,22 @@ import {
   renewalDraftSchema,
   POLICY_TERM_OPTIONS,
   LOST_REASON_OPTIONS,
+  termOfExistingPolicy,
   type PolicyTerm,
   type LostReasonCategory,
 } from '@/lib/renewals/renewalTerm';
+import { extractLocalDate } from '@/lib/date/localDate';
 import { useCarriers } from '@/hooks/useLookupData';
-import { formatMoney as formatCurrency } from '@/lib/renewals/format';
+import { formatMoney as formatCurrency, formatShortDate } from '@/lib/renewals/format';
 
 type Outcome = 'renewed' | 'moved' | 'lost';
+
+/** A conflict the commit hit, resolved in place by the dialog instead of a dead end. */
+interface MoveConflict {
+  code: MovedConflictCode;
+  policyId: string | null;
+  accountId: string | null;
+}
 
 const TERMINAL = new Set([
   'renewed', 'moved', 'lost', 'cancelled', 'non_renewed', 'lapsed', 'completed',
@@ -118,11 +130,63 @@ export function UpdateRenewalWidget({ renewal }: Props) {
   const [lostReason, setLostReason] = useState('');
   const [terminationDate, setTerminationDate] = useState(renewal.expiration_date || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // Set when a Move hits an existing policy number: carries the owner account for the deep link.
-  const [dupModal, setDupModal] = useState<{ accountId: string } | null>(null);
+  // Set when a Move hits a policy number that is already live somewhere.
+  const [conflict, setConflict] = useState<MoveConflict | null>(null);
+  // The already-on-file policy the agent picked as the replacement, if any.
+  const [linkPolicyId, setLinkPolicyId] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState<'dec_page' | 'application'>('dec_page');
+
+  // The customer's other in-force policies, so a replacement the office already added by hand
+  // can be linked instead of duplicated. Only loaded while the Moved outcome is open.
+  const { data: policyOptions = [] } = useAccountPolicyOptions(
+    outcome === 'moved' ? renewal.account_id : null,
+    renewal.policy_id,
+  );
+  const linkedPolicy = policyOptions.find((p) => p.id === linkPolicyId) || null;
+  // The policy a blocked commit collided with, when it is one this customer can actually link.
+  const conflictPolicy = policyOptions.find((p) => p.id === conflict?.policyId) || null;
+  // Fields as they were before a link was picked, so deselecting puts the draft back.
+  const preLinkRef = useRef<{
+    policyNumber: string; premium: string; term: PolicyTerm;
+    effectiveDate: string; expirationDate: string; movedCarrier: string;
+  } | null>(null);
+
+  /**
+   * Pick (or clear) the already-on-file replacement. Picking mirrors that policy's details into
+   * the form so the agent commits exactly what they see; the RPC reads them from the policy
+   * itself and never edits it.
+   */
+  function selectLinkedPolicy(p: MovePolicyOption | null) {
+    setErrors({});
+    if (!p) {
+      const prev = preLinkRef.current;
+      if (prev) {
+        setPolicyNumber(prev.policyNumber);
+        setPremium(prev.premium);
+        setTerm(prev.term);
+        setEffectiveDate(prev.effectiveDate);
+        setExpirationDate(prev.expirationDate);
+        setMovedCarrier(prev.movedCarrier);
+      }
+      preLinkRef.current = null;
+      setLinkPolicyId(null);
+      return;
+    }
+    if (!preLinkRef.current) {
+      preLinkRef.current = {
+        policyNumber, premium, term, effectiveDate, expirationDate, movedCarrier,
+      };
+    }
+    setLinkPolicyId(p.id);
+    setPolicyNumber(p.policy_number || '');
+    setPremium(p.premium != null ? String(p.premium) : '');
+    setTerm(termOfExistingPolicy(p));
+    setEffectiveDate(extractLocalDate(p.effective_date));
+    setExpirationDate(extractLocalDate(p.expiration_date));
+    setMovedCarrier(p.carrier || '');
+  }
 
   const priorPremium = renewal.current_premium ?? null;
   const premiumNum = toNumber(premium);
@@ -225,12 +289,13 @@ export function UpdateRenewalWidget({ renewal }: Props) {
     }, { onError: () => { committingRef.current = false; } });
   }
 
-  function handleMoved() {
-    if (!validateDraft() || !renewal.policy_id) return;
-    if (!movedCarrier.trim()) {
-      setErrors((e) => ({ ...e, movedCarrier: 'New carrier is required' }));
-      return;
-    }
+  /**
+   * Commit the move. With `existingPolicyId` the already-on-file policy is linked as the
+   * replacement; without it a new policy is created. A blocked commit lands in the conflict
+   * dialog, which can retry as a link.
+   */
+  function commitMove(existingPolicyId: string | null) {
+    if (!renewal.policy_id) return;
     committingRef.current = true;
     markMoved.mutate(
       {
@@ -243,16 +308,30 @@ export function UpdateRenewalWidget({ renewal }: Props) {
         policy_term: term,
         effective_date: effectiveDate,
         expiration_date: expirationDate,
+        existingPolicyId,
       },
       {
         onError: (err: any) => {
           committingRef.current = false;
-          if (err?.code === 'DUPLICATE_POLICY') {
-            setDupModal({ accountId: err.existingAccountId || renewal.account_id });
+          if (err?.code === 'DUPLICATE_POLICY' || err?.code === 'POLICY_ON_ACCOUNT' || err?.code === 'SAME_POLICY_NUMBER') {
+            setConflict({
+              code: err.code,
+              policyId: err.existingPolicyId || null,
+              accountId: err.existingAccountId || null,
+            });
           }
         },
       },
     );
+  }
+
+  function handleMoved() {
+    if (!validateDraft() || !renewal.policy_id) return;
+    if (!movedCarrier.trim()) {
+      setErrors((e) => ({ ...e, movedCarrier: 'New carrier is required' }));
+      return;
+    }
+    commitMove(linkPolicyId);
   }
 
   function handleLost() {
@@ -486,7 +565,13 @@ export function UpdateRenewalWidget({ renewal }: Props) {
               <button
                 key={o.key}
                 type="button"
-                onClick={() => { setOutcome(active ? null : o.key); setErrors({}); }}
+                onClick={() => {
+                  const next = active ? null : o.key;
+                  // Leaving Moved drops any linked replacement and puts the draft back.
+                  if (outcome === 'moved' && next !== 'moved') selectLinkedPolicy(null);
+                  setOutcome(next);
+                  setErrors({});
+                }}
                 disabled={!canCommit}
                 className={cn(
                   'flex items-center justify-center gap-2 rounded-cc-md border px-3 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
@@ -511,15 +596,79 @@ export function UpdateRenewalWidget({ renewal }: Props) {
               value={movedCarrier}
               onChange={(e) => setMovedCarrier(e.target.value)}
               placeholder="Carrier the customer moved to"
-              className={cn(inputCls, 'mt-1.5', errors.movedCarrier && errCls)}
+              readOnly={!!linkedPolicy}
+              className={cn(inputCls, 'mt-1.5', errors.movedCarrier && errCls, linkedPolicy && 'text-cc-text-secondary')}
             />
             <datalist id="r-carrier-options">
               {carriers.map((c: any) => <option key={c.id} value={c.name} />)}
             </datalist>
             {errors.movedCarrier && <p className="mt-1 text-xs text-cc-danger">{errors.movedCarrier}</p>}
-            <p className="mt-2 text-xs text-cc-text-muted">
-              Uses the policy number, premium, term and dates above as the new policy details. The current
-              policy is set to Inactive and a new policy is created.
+
+            {policyOptions.length > 0 && (
+              <div className="mt-4">
+                <Label className="text-cc-text-muted">New policy already on the file</Label>
+                <p className="mt-1 text-xs text-cc-text-muted">
+                  If the office already added the replacement, pick it here. It is linked as the new
+                  policy and nothing on it changes.
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {policyOptions.map((p) => {
+                    const picked = p.id === linkPolicyId;
+                    return (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          aria-pressed={picked}
+                          onClick={() => selectLinkedPolicy(picked ? null : p)}
+                          className={cn(
+                            'flex w-full items-center justify-between gap-3 rounded-cc-md border px-3 py-2.5 text-left transition-colors',
+                            picked
+                              ? 'border-cc-accent bg-cc-surface-overlay'
+                              : 'border-cc-border-subtle bg-cc-surface-raised hover:border-cc-border-interactive',
+                          )}
+                        >
+                          <span className="min-w-0">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-cc-sm bg-cc-surface-overlay px-2 py-0.5 text-xs text-cc-text-secondary">
+                                {p.carrier || 'No carrier'}
+                              </span>
+                              <span className="cc-num text-sm font-semibold text-cc-text-primary">
+                                {p.policy_number}
+                              </span>
+                              {p.line_of_business && (
+                                <span className="text-xs text-cc-text-muted">{p.line_of_business}</span>
+                              )}
+                            </span>
+                            <span className="mt-1 block text-xs text-cc-text-muted">
+                              <span className="cc-num">{formatCurrency(p.premium)}</span>
+                              {' · '}
+                              <span className="cc-num">{formatShortDate(p.effective_date)}</span>
+                              {' to '}
+                              <span className="cc-num">{formatShortDate(p.expiration_date)}</span>
+                            </span>
+                          </span>
+                          {picked && <Check className="h-4 w-4 shrink-0 text-cc-accent" />}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            <p className="mt-3 text-xs text-cc-text-muted">
+              {linkedPolicy ? (
+                <>
+                  The current policy is retired and this renewal closes against policy{' '}
+                  <span className="cc-num text-cc-text-secondary">{linkedPolicy.policy_number}</span>.
+                  No new policy is created, and the details recorded come from that policy.
+                </>
+              ) : (
+                <>
+                  Uses the policy number, premium, term and dates above as the new policy details. The
+                  current policy is retired and a new policy is created.
+                </>
+              )}
             </p>
           </div>
         )}
@@ -584,36 +733,81 @@ export function UpdateRenewalWidget({ renewal }: Props) {
         )}
       </div>
 
-      <Dialog open={!!dupModal} onOpenChange={(o) => { if (!o) setDupModal(null); }}>
+      <Dialog open={!!conflict} onOpenChange={(o) => { if (!o) setConflict(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Policy already added</DialogTitle>
+            <DialogTitle>
+              {conflict?.code === 'SAME_POLICY_NUMBER'
+                ? 'That is the current policy number'
+                : conflict?.code === 'POLICY_ON_ACCOUNT'
+                ? 'This policy is already on the file'
+                : 'Policy number belongs to another customer'}
+            </DialogTitle>
             <DialogDescription>
-              The new policy you are trying to add is already added for this customer. Open the
-              customer's Policies to review it.
+              {conflict?.code === 'SAME_POLICY_NUMBER' ? (
+                <>
+                  The policy number is still the one being renewed. Enter the new carrier's policy
+                  number, or pick the policy already on the file under New carrier.
+                </>
+              ) : conflict?.code === 'POLICY_ON_ACCOUNT' && conflictPolicy ? (
+                <>
+                  Policy <span className="cc-num">{conflictPolicy.policy_number}</span> with{' '}
+                  {conflictPolicy.carrier || 'this carrier'} is already added on this customer. Use
+                  it as the new policy to finish the move. Nothing on it changes.
+                </>
+              ) : conflict?.code === 'POLICY_ON_ACCOUNT' ? (
+                <>
+                  This policy number is already added on this customer, on a policy that is no
+                  longer in force. Check the number before recording the move.
+                </>
+              ) : (
+                <>
+                  This policy number is already added on a different customer. Policy numbers are
+                  unique, so check the number before recording the move.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDupModal(null)}
-              className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
-            >
-              Close
-            </Button>
-            <Button
-              type="button"
-              data-primary
-              onClick={() => {
-                const id = dupModal?.accountId;
-                setDupModal(null);
-                if (id) navigate(`/customers/${id}?tab=policies`);
-              }}
-              className="gap-2 rounded-cc-md bg-cc-accent text-cc-on-accent hover:bg-cc-accent-hover"
-            >
-              View in Policies
-            </Button>
+            {conflict?.accountId && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const id = conflict.accountId;
+                  setConflict(null);
+                  if (id) navigate(`/customers/${id}?tab=policies`);
+                }}
+                className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+              >
+                View in Policies
+              </Button>
+            )}
+            {conflict?.code === 'POLICY_ON_ACCOUNT' && conflictPolicy ? (
+              <Button
+                type="button"
+                data-primary
+                disabled={committing}
+                onClick={() => {
+                  const picked = conflictPolicy;
+                  setConflict(null);
+                  selectLinkedPolicy(picked);
+                  commitMove(picked.id);
+                }}
+                className="gap-2 rounded-cc-md bg-cc-accent text-cc-on-accent hover:bg-cc-accent-hover"
+              >
+                {committing ? 'Saving...' : 'Use this policy'}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                data-primary
+                onClick={() => setConflict(null)}
+                className="gap-2 rounded-cc-md bg-cc-accent text-cc-on-accent hover:bg-cc-accent-hover"
+              >
+                Back to the form
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

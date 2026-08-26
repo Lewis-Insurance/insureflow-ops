@@ -7,6 +7,7 @@ import {
   termLabel,
   mapLostReason,
   renewalDraftSchema,
+  termOfExistingPolicy,
 } from './renewalTerm';
 
 describe('deriveExpiration', () => {
@@ -93,5 +94,47 @@ describe('renewalDraftSchema', () => {
   });
   it('rejects expiration not strictly after effective', () => {
     expect(renewalDraftSchema.safeParse({ ...valid, expiration_date: '2026-06-03' }).success).toBe(false);
+  });
+});
+
+describe('termOfExistingPolicy', () => {
+  it('uses the policy own term when it is set', () => {
+    expect(termOfExistingPolicy({ policy_term: 'semiannual' })).toBe('semiannual');
+    expect(termOfExistingPolicy({ policy_term: '6_month' })).toBe('semiannual');
+    expect(termOfExistingPolicy({ policy_term: 'annual' })).toBe('annual');
+  });
+  it('ignores the date span when the term is set', () => {
+    expect(
+      termOfExistingPolicy({
+        policy_term: 'annual',
+        effective_date: '2026-07-28',
+        expiration_date: '2027-01-28',
+      }),
+    ).toBe('annual');
+  });
+  it('reads a 6 month span off the dates when the term is missing', () => {
+    expect(
+      termOfExistingPolicy({ effective_date: '2026-08-10', expiration_date: '2027-02-10' }),
+    ).toBe('semiannual');
+  });
+  it('reads a 12 month span off the dates when the term is missing', () => {
+    expect(
+      termOfExistingPolicy({ effective_date: '2026-07-28', expiration_date: '2027-07-28' }),
+    ).toBe('annual');
+  });
+  it('accepts timestamp strings and stays on the local date', () => {
+    expect(
+      termOfExistingPolicy({
+        effective_date: '2026-08-10T00:00:00.000Z',
+        expiration_date: '2027-02-10T00:00:00.000Z',
+      }),
+    ).toBe('semiannual');
+  });
+  it('falls back to annual when the dates are missing or backwards', () => {
+    expect(termOfExistingPolicy({})).toBe('annual');
+    expect(termOfExistingPolicy({ effective_date: '2026-08-10' })).toBe('annual');
+    expect(
+      termOfExistingPolicy({ effective_date: '2027-02-10', expiration_date: '2026-08-10' }),
+    ).toBe('annual');
   });
 });
