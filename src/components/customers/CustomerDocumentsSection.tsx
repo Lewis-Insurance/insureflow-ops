@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Chip } from '@/components/cc';
 import { useDocumentManager } from '@/hooks/useDocumentManager';
 import { UploadDocModal } from './UploadDocModal';
 import { EditDocumentModal } from './EditDocumentModal';
-import { FileText, Download, Trash2, Upload, Calendar, FileType, Brain, Pencil } from 'lucide-react';
+import { FileText, Download, Trash2, Upload, Calendar, FileType, Brain, Pencil, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useState, useCallback } from 'react';
 import { useAIAssistantContext } from '@/contexts/AIAssistantContext';
@@ -18,6 +19,7 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
   const {
     documents,
     loading,
+    loadError,
     checking,
     viewDocument,
     downloadDocument,
@@ -105,7 +107,8 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Documents ({documents.length})
+          {/* No count while the load is broken. A "0" would read as a fact. */}
+          Documents{loadError ? '' : ` (${documents.length})`}
         </CardTitle>
         <div className="flex gap-2">
           {canManageDocuments && (
@@ -130,7 +133,22 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
         </div>
       </CardHeader>
       <CardContent>
-        {documents.length === 0 ? (
+        {loadError ? (
+          // Never show "no documents" for a failed load. On an E&O trail an
+          // empty list is an answer, and it would be the wrong one.
+          <div className="rounded-cc-md border border-destructive/40 bg-destructive/10 p-4">
+            <div className="flex items-center gap-2 font-medium text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              Documents could not be loaded
+            </div>
+            <p className="mt-1 text-sm text-cc-text-muted">
+              This list is not accurate right now. Try again before assuming nothing is on file.
+            </p>
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => fetchDocuments()}>
+              Try again
+            </Button>
+          </div>
+        ) : documents.length === 0 ? (
           <div className="text-center py-8">
             <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Documents</h3>
@@ -163,6 +181,23 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                           <Badge variant={getCategoryColor(document.category)} className="text-xs">
                             {document.category}
                           </Badge>
+                        )}
+                        {/* Which policy this file is filed under, when it is
+                            filed under one. Carriers and policies are name
+                            chips, never colors. */}
+                        {document.policy_id && (
+                          <Chip>
+                            {document.policy?.policy_number ? (
+                              <>
+                                Policy #
+                                <span className="cc-num font-mono">
+                                  {document.policy.policy_number}
+                                </span>
+                              </>
+                            ) : (
+                              'On a policy'
+                            )}
+                          </Chip>
                         )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">

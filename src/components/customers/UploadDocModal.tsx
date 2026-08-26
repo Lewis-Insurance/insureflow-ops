@@ -11,6 +11,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { usePoliciesByAccount } from '@/hooks/usePoliciesByAccount';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
 import { useAutoClassifyDocument, useAutoRouteDocument } from '@/hooks/useDocumentClassification';
+import {
+  CUSTOMER_DOCUMENT_ACCEPT,
+  CustomerDocumentUploadError,
+  uploadCustomerDocument,
+} from '@/lib/documents/uploadCustomerDocument';
 
 interface UploadDocModalProps {
   open: boolean;
@@ -67,65 +72,21 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
     
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: 'Error',
-          description: 'You must be logged in to upload documents',
-          variant: 'destructive',
+      // Shared upload path (storage object + documents row), so this modal and
+      // the policy card drop control write identical rows.
+      let document: Awaited<ReturnType<typeof uploadCustomerDocument>>;
+      try {
+        document = await uploadCustomerDocument({
+          file,
+          accountId,
+          name: documentName,
+          policyId: associationType === 'policy' && selectedPolicyId ? selectedPolicyId : null,
         });
-        return;
-      }
-
-      // Generate unique file path
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${accountId}/${fileName}`;
-
-      // Upload file to storage
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file);
-
-      if (uploadError) {
+      } catch (uploadError) {
+        const isKnown = uploadError instanceof CustomerDocumentUploadError;
         toast({
-          title: 'Upload Error',
-          description: uploadError.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Create document record
-      const documentData = {
-        account_id: accountId,
-        uploaded_by: user.id,
-        storage_path: filePath,
-        // Some readers (extract-wc-policy) resolve the file via file_path; keep
-        // both in sync so freshly uploaded docs are extractable (review fix).
-        file_path: filePath,
-        storage_bucket: 'documents',
-        file_missing: false,
-        filename: file.name,
-        name: documentName || file.name,
-        mime_type: file.type,
-        size_bytes: file.size,
-        kind: 'customer_document' as const,
-        ...(associationType === 'policy' && selectedPolicyId ? { policy_id: selectedPolicyId } : {}),
-      };
-
-      const { data: document, error: dbError } = await supabase
-        .from('documents')
-        .insert(documentData)
-        .select()
-        .single();
-
-      if (dbError) {
-        // Clean up uploaded file if DB insert fails
-        await supabase.storage.from('documents').remove([filePath]);
-        toast({
-          title: 'Database Error',
-          description: dbError.message,
+          title: isKnown && uploadError.stage === 'database' ? 'Database Error' : 'Upload Error',
+          description: isKnown ? uploadError.message : 'Failed to upload document',
           variant: 'destructive',
         });
         return;
@@ -133,10 +94,11 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
 
       // Create note if provided
       if (noteContent.trim()) {
+        const { data: { user } } = await supabase.auth.getUser();
         const { error: noteError } = await supabase.from('customer_notes').insert({
           customer_id: accountId,
           note_text: noteContent,
-          created_by: user.id,
+          created_by: user?.id,
           source: 'document',
           // Keep the policy tag when the upload is policy-associated so the
           // note carries its context chip.
@@ -240,8 +202,8 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
             <Input 
               id="file"
               type="file" 
-              onChange={(e) => setFile(e.target.files?.[0] || null)} 
-              accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              accept={CUSTOMER_DOCUMENT_ACCEPT}
             />
             {file && (
               <p className="text-sm text-muted-foreground mt-1">
