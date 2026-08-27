@@ -7,6 +7,11 @@ const migrationPath = resolve(
   '../../../supabase/migrations/20260827210000_portal_user_accounts.sql',
 );
 const sql = readFileSync(migrationPath, 'utf8');
+const fixMigrationPath = resolve(
+  import.meta.dirname,
+  '../../../supabase/migrations/20260827220000_fix_portal_user_policies_columns.sql',
+);
+const fixSql = readFileSync(fixMigrationPath, 'utf8');
 
 describe('portal user accounts migration', () => {
   it('uses the reserved migration filename', () => {
@@ -61,13 +66,40 @@ describe('portal user accounts migration', () => {
   });
 
   it('keeps policies owner-FK and expands them through CPU plus junction accounts', () => {
+    const forward = sql.slice(0, sql.indexOf('-- ROLLBACK SQL'));
+    const rollback = sql.slice(sql.indexOf('-- ROLLBACK SQL'));
     expect(sql).toMatch(/cpu\.id AS portal_user_id/);
     expect(sql).not.toMatch(/cpu\.user_id AS portal_user_id/);
     expect(sql).toMatch(
       /JOIN public\.accounts a ON a\.id IN \(\s*SELECT cpu\.account_id\s*UNION\s*SELECT pua\.account_id/,
     );
     expect(sql).toMatch(/JOIN public\.policies p ON p\.account_id = a\.id/);
+    for (const view of [forward, rollback]) {
+      expect(view).toMatch(/p\.line_of_business AS policy_type/);
+      expect(view).toMatch(/\n(?:-- )?[ ]{2}p\.line_of_business,/);
+      expect(view).toMatch(/c\.name AS carrier_name/);
+      expect(view).toMatch(/LEFT JOIN public\.carriers c ON c\.id = p\.carrier_id/);
+      expect(view).not.toMatch(/p\.policy_type/);
+      expect(view).not.toMatch(/p\.carrier_name/);
+    }
     expect(sql).not.toMatch(/INSERT INTO public\.policies/);
+  });
+
+  it('repairs the view idempotently for environments that recorded the first migration', () => {
+    expect(fixMigrationPath).toMatch(
+      /20260827220000_fix_portal_user_policies_columns\.sql$/,
+    );
+    expect(fixSql).toMatch(/CREATE OR REPLACE VIEW public\.portal_user_policies/);
+    expect(fixSql).toMatch(/p\.line_of_business AS policy_type/);
+    expect(fixSql).toMatch(/\n[ ]{2}p\.line_of_business,/);
+    expect(fixSql).toMatch(/c\.name AS carrier_name/);
+    expect(fixSql).toMatch(/LEFT JOIN public\.carriers c ON c\.id = p\.carrier_id/);
+    expect(fixSql).not.toMatch(/p\.policy_type/);
+    expect(fixSql).not.toMatch(/p\.carrier_name/);
+    expect(fixSql).toMatch(/GRANT SELECT ON public\.portal_user_policies TO authenticated/);
+    expect(fixSql).toMatch(
+      /COMMENT ON VIEW public\.portal_user_policies IS\s*'Owner-FK policies for every account explicitly accessible to one portal user'/,
+    );
   });
 
   it('applies commercial-only invite defaults and omits same_as', () => {

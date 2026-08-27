@@ -193,12 +193,13 @@ SELECT
   cpu.last_name,
   p.id AS policy_id,
   p.policy_number,
-  p.policy_type,
+  p.line_of_business AS policy_type,
+  p.line_of_business,
   p.status AS policy_status,
   p.effective_date,
   p.expiration_date,
   p.premium,
-  p.carrier_name,
+  c.name AS carrier_name,
   a.id AS account_id,
   a.name AS account_name
 FROM public.client_portal_users cpu
@@ -210,6 +211,7 @@ JOIN public.accounts a ON a.id IN (
   WHERE pua.portal_user_id = cpu.id
 )
 JOIN public.policies p ON p.account_id = a.id
+LEFT JOIN public.carriers c ON c.id = p.carrier_id
 WHERE cpu.portal_status = 'active'
   AND p.status IN ('active', 'pending', 'renewal');
 
@@ -478,17 +480,19 @@ COMMENT ON COLUMN public.portal_invitations.scope_account_ids IS
 --   cpu.last_name,
 --   p.id AS policy_id,
 --   p.policy_number,
---   p.policy_type,
+--   p.line_of_business AS policy_type,
+--   p.line_of_business,
 --   p.status AS policy_status,
 --   p.effective_date,
 --   p.expiration_date,
 --   p.premium,
---   p.carrier_name,
+--   c.name AS carrier_name,
 --   a.id AS account_id,
 --   a.name AS account_name
 -- FROM public.client_portal_users cpu
 -- JOIN public.accounts a ON a.id = cpu.account_id
 -- JOIN public.policies p ON p.account_id = a.id
+-- LEFT JOIN public.carriers c ON c.id = p.carrier_id
 -- WHERE cpu.portal_status = 'active'
 --   AND p.status IN ('active', 'pending', 'renewal');
 -- GRANT SELECT ON public.portal_user_policies TO authenticated;
