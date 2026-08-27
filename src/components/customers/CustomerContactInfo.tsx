@@ -4,7 +4,7 @@ import { EditContactInfoModal } from './EditContactInfoModal';
 import { useState } from 'react';
 import { SMSComposerModal } from '@/components/communications/SMSComposerModal';
 import { humanizeEnum, humanizeLine, formatPhoneForDisplay } from '@/lib/format';
-import { usePolicies } from '@/hooks/usePolicies';
+import { usePoliciesByAccount } from '@/hooks/usePoliciesByAccount';
 
 interface CustomerAccount {
   id: string;
@@ -51,9 +51,9 @@ export function CustomerContactInfo({ account, onSendEmail, onAccountUpdated }: 
 
   // Active-policy bubbles in the contact header row. Same React Query key as the
   // Policies section, so this shares that fetch rather than issuing a second one.
-  const { data: allPolicies = [] } = usePolicies({ accountId: account.id });
+  const { data: allPolicies = [] } = usePoliciesByAccount(account.id);
   const activePolicies = allPolicies.filter(
-    (p) => p.account_id === account.id && ['active', 'bound', 'pending'].includes((p.status ?? 'active').toLowerCase()),
+    (p) => ['active', 'bound', 'pending'].includes((p.status ?? 'active').toLowerCase()),
   );
 
   /** Jump from a policy bubble to that policy's card below and flash it. */

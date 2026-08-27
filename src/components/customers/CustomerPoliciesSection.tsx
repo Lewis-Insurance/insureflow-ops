@@ -8,7 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StatusPill, Chip, AccentSpine } from '@/components/cc';
-import { usePolicies, type PolicyWithAccount } from '@/hooks/usePolicies';
+import { type PolicyWithAccount } from '@/hooks/usePolicies';
+import { usePoliciesByAccount, type AccountPolicy } from '@/hooks/usePoliciesByAccount';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
 import { Shield, Calendar, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -45,7 +46,7 @@ function hasCoverage(coverage: unknown): boolean {
 export function CustomerPoliciesSection({ accountId, customerName }: CustomerPoliciesSectionProps) {
   // Server-side scoped to this account: the unfiltered hook paginates the entire
   // policies book (1000-row pages with 3 joins) on every customer record open.
-  const { data: allPolicies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePolicies({ accountId });
+  const { data: policies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePoliciesByAccount(accountId);
   const { data: quotes = [], isLoading: quotesLoading, refetch: refetchQuotes } = useQuotesByAccount(accountId);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -67,15 +68,12 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
     }
   }, [quotes, initialPoliciesTab]);
 
-  // Filter policies for this specific customer
-  const policies = allPolicies.filter(policy => policy.account_id === accountId);
-
   // Split policies into active and inactive. Active is the explicit live set; inactive is
   // EVERYTHING else (catch-all) so a terminal status the list doesn't enumerate (e.g. a
   // renewal marked 'lost' or 'non_renewed') can never fall through both filters and vanish
   // from the customer record. A null status defaults to active (unchanged prior behavior).
   const ACTIVE_STATUSES = ['active', 'bound', 'pending'];
-  const isActivePolicy = (policy: PolicyWithAccount) =>
+  const isActivePolicy = (policy: AccountPolicy) =>
     ACTIVE_STATUSES.includes(policy.status?.toLowerCase() || 'active');
   const activePolicies = policies.filter(isActivePolicy);
   const inactivePolicies = policies.filter((policy) => !isActivePolicy(policy));
@@ -140,9 +138,10 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
   // three-dot overflow, and a compact add-a-document control. No per-card lime
   // fill: the surface shows many cards and the one lime fill on this tab is the
   // section-level "New policy" button.
-  const renderPolicyCard = (policy: PolicyWithAccount, variant: 'active' | 'inactive') => {
+  const renderPolicyCard = (policy: AccountPolicy, variant: 'active' | 'inactive') => {
     const openPolicy = () => navigate(`/policies/${policy.id}`);
     const isActive = variant === 'active';
+    const isShared = policy.membership === 'named_insured';
 
     return (
       <AccentSpine key={policy.id} id={`policy-${policy.id}`} active={isActive} className="scroll-mt-24 p-4">
@@ -154,6 +153,7 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
                 {humanizeLine(policy.line_of_business) || 'General policy'}
               </h4>
               <StatusPill status={policy.status || (isActive ? 'active' : 'cancelled')} />
+              {isShared && <Chip>Shared / Named Insured</Chip>}
             </div>
             <div className="space-y-1 text-sm text-cc-text-muted">
               {policy.policy_number && (
@@ -166,6 +166,12 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
                 <div className="flex items-center gap-2">
                   <Building className="h-3 w-3" />
                   <Chip>{humanizeCarrier(policy.carrier_info.name)}</Chip>
+                </div>
+              )}
+              {isShared && (
+                <div>
+                  <span>Owner: </span>
+                  <span className="text-cc-text-secondary">{policy.owner_account_name}</span>
                 </div>
               )}
             </div>
@@ -200,7 +206,7 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
             <span className="text-cc-text-muted text-xs">Premium</span>
             <div className="mt-0.5 flex items-baseline gap-1.5">
               <span className="cc-num font-mono text-xl font-semibold text-cc-text-primary">
-                {formatCurrency(policy.premium)}
+                {policy.premium == null ? '-' : formatCurrency(policy.premium)}
               </span>
               {policy.premium ? (
                 <span className="text-sm text-cc-text-muted">
@@ -208,6 +214,11 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
                 </span>
               ) : null}
             </div>
+            {isShared && (
+              <p className="mt-1 text-xs text-cc-text-muted">
+                Counted on {policy.owner_account_name}
+              </p>
+            )}
           </div>
         </div>
 
@@ -223,7 +234,7 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
             View full policy
           </Button>
 
-          <DropdownMenu>
+          {!isShared && <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
@@ -293,16 +304,18 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu>}
 
           {/* Drop a file here, or click to pick one. The policy is already known,
               so it uploads straight away with documents.policy_id set and shows
               up in the Documents panel below carrying its Policy # chip. */}
-          <PolicyDocumentDrop
-            accountId={accountId}
-            policyId={policy.id}
-            policyLabel={policy.policy_number}
-          />
+          {!isShared && (
+            <PolicyDocumentDrop
+              accountId={accountId}
+              policyId={policy.id}
+              policyLabel={policy.policy_number}
+            />
+          )}
         </div>
 
         {/* Coverage line: muted summary or nothing. Never a raw object. */}
