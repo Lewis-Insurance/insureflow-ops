@@ -104,6 +104,9 @@ export function ClusterHub({ accountId, cluster, rollup, loading }: Props) {
                   {rollup.business_count === 1 ? 'company' : 'companies'} ·{' '}
                   <span className="cc-num">{rollup.total_policies}</span> policies in the cluster
                 </p>
+                <p className="mt-1 text-xs text-cc-text-muted">
+                  Shared lines live on the parent account.
+                </p>
               </div>
             </div>
             <div className="text-right">

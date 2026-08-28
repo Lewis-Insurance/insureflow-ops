@@ -10,6 +10,7 @@ import {
 import { StatusPill, Chip, AccentSpine } from '@/components/cc';
 import { type PolicyWithAccount } from '@/hooks/usePolicies';
 import { usePoliciesByAccount, type AccountPolicy } from '@/hooks/usePoliciesByAccount';
+import { usePolicyNamedInsureds } from '@/hooks/usePolicyNamedInsureds';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
 import { Shield, Calendar, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -47,6 +48,10 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
   // Server-side scoped to this account: the unfiltered hook paginates the entire
   // policies book (1000-row pages with 3 joins) on every customer record open.
   const { data: policies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePoliciesByAccount(accountId);
+  const ownerPolicyIds = policies
+    .filter((policy) => policy.membership === 'owner')
+    .map((policy) => policy.id);
+  const { data: namedInsuredLinks = [] } = usePolicyNamedInsureds(ownerPolicyIds);
   const { data: quotes = [], isLoading: quotesLoading, refetch: refetchQuotes } = useQuotesByAccount(accountId);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -142,6 +147,9 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
     const openPolicy = () => navigate(`/policies/${policy.id}`);
     const isActive = variant === 'active';
     const isShared = policy.membership === 'named_insured';
+    const alsoNamed = isShared
+      ? []
+      : namedInsuredLinks.filter((link) => link.policy_id === policy.id);
 
     return (
       <AccentSpine key={policy.id} id={`policy-${policy.id}`} active={isActive} className="scroll-mt-24 p-4">
@@ -172,6 +180,14 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
                 <div>
                   <span>Owner: </span>
                   <span className="text-cc-text-secondary">{policy.owner_account_name}</span>
+                </div>
+              )}
+              {alsoNamed.length > 0 && (
+                <div>
+                  <span>Also named: </span>
+                  <span className="text-cc-text-secondary">
+                    {alsoNamed.map((link) => link.name).join(', ')}
+                  </span>
                 </div>
               )}
             </div>
