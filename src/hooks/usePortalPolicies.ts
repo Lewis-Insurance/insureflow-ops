@@ -5,14 +5,14 @@ export function usePortalPolicies(accountId: string | null) {
   return useQuery({
     queryKey: ['portal-policies', accountId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('portal_user_policies')
-        .select('policy_id, policy_number, line_of_business, carrier_name, policy_status, effective_date, expiration_date')
-        .eq('account_id', accountId!)
-        .order('expiration_date', { ascending: true });
+      const { data, error } = await supabase.rpc('list_my_portal_policies', {
+        p_account_id: accountId!,
+      });
 
       if (error) throw error;
-      return data;
+      return [...data].sort((left, right) =>
+        (left.expiration_date ?? '').localeCompare(right.expiration_date ?? ''),
+      );
     },
     enabled: !!accountId,
   });

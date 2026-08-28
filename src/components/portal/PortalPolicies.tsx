@@ -37,7 +37,7 @@ export function PortalPolicies({ accountId }: { accountId: string }) {
   return (
     <div className="space-y-2">
       {policies.map((policy) => (
-        <Card key={policy.policy_id}>
+        <Card key={policy.id}>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
             <div>
               <p className="font-semibold">{policy.line_of_business || 'Insurance policy'}</p>
@@ -47,7 +47,10 @@ export function PortalPolicies({ accountId }: { accountId: string }) {
               <p>{policy.carrier_name}</p>
               {policy.expiration_date && <p>Expires {formatLocalDateDisplay(policy.expiration_date)}</p>}
             </div>
-            <Badge variant="secondary">{policy.policy_status || 'Status unavailable'}</Badge>
+            <div className="flex items-center gap-2">
+              {policy.membership === 'named_insured' && <Badge variant="outline">Shared</Badge>}
+              <Badge variant="secondary">{policy.status || 'Status unavailable'}</Badge>
+            </div>
           </CardContent>
         </Card>
       ))}

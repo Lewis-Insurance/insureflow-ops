@@ -43540,6 +43540,24 @@ export type Database = {
           name: string
         }[]
       }
+      list_my_portal_policies: {
+        Args: { p_account_id: string }
+        Returns: {
+          account_id: string
+          carrier_name: string | null
+          effective_date: string | null
+          expiration_date: string | null
+          id: string
+          line_of_business: string | null
+          membership: string
+          named_insured: string | null
+          owner_account_id: string
+          owner_account_name: string
+          policy_number: string | null
+          premium: number | null
+          status: string | null
+        }[]
+      }
       portal_has_permission: {
         Args: { p_permission: string }
         Returns: boolean

@@ -116,12 +116,14 @@ describe('portal cluster switcher', () => {
     const requests = readFileSync('src/hooks/useServiceRequests.ts', 'utf8');
     const policies = readFileSync('src/hooks/usePortalPolicies.ts', 'utf8');
 
-    for (const source of [documents, cards, requests, policies]) {
+    for (const source of [documents, cards, requests]) {
       expect(source).toContain(".eq('account_id', accountId!)");
       expect(source).toContain('enabled: !!accountId');
     }
+    expect(policies).toContain('p_account_id: accountId!');
+    expect(policies).toContain('enabled: !!accountId');
     expect(requests).toContain('p_account_id: accountId');
-    expect(policies).toContain(".from('portal_user_policies')");
+    expect(policies).toContain("rpc('list_my_portal_policies'");
     expect(policies).not.toContain('list_account_policies');
   });
 });
