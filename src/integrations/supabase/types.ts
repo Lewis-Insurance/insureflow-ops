@@ -40886,6 +40886,27 @@ export type Database = {
           },
         ]
       }
+      portal_user_policies: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          auth_user_id: string | null
+          carrier_name: string | null
+          effective_date: string | null
+          expiration_date: string | null
+          first_name: string | null
+          last_name: string | null
+          line_of_business: string | null
+          policy_id: string | null
+          policy_number: string | null
+          policy_status: string | null
+          policy_type: string | null
+          portal_user_email: string | null
+          portal_user_id: string | null
+          premium: number | null
+        }
+        Relationships: []
+      }
       predictive_analytics_dashboard: {
         Row: {
           actual_churns: number | null
@@ -42144,6 +42165,7 @@ export type Database = {
       }
       create_my_service_request: {
         Args: {
+          p_account_id?: string
           p_policy_id?: string
           p_prefilled_data?: Json
           p_request_data: Json
@@ -43508,6 +43530,14 @@ export type Database = {
         Args: never
         Returns: {
           account_id: string
+        }[]
+      }
+      list_my_portal_accounts: {
+        Args: never
+        Returns: {
+          account_id: string
+          is_home: boolean
+          name: string
         }[]
       }
       portal_has_permission: {

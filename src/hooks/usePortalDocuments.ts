@@ -10,15 +10,16 @@ import { supabase } from '@/integrations/supabase/client';
 import type { PortalDocument } from '@/types/portal';
 import { logger } from '@/lib/logger';
 
-export function usePortalDocuments(policyId?: string) {
+export function usePortalDocuments(accountId: string | null, policyId?: string) {
   const queryClient = useQueryClient();
 
   const documentsQuery = useQuery({
-    queryKey: ['portal-documents', policyId],
+    queryKey: ['portal-documents', accountId, policyId],
     queryFn: async () => {
       let query = supabase
         .from('portal_documents')
         .select('*')
+        .eq('account_id', accountId!)
         .order('created_at', { ascending: false });
 
       if (policyId) {
@@ -29,6 +30,7 @@ export function usePortalDocuments(policyId?: string) {
       if (error) throw error;
       return data as PortalDocument[];
     },
+    enabled: !!accountId,
   });
 
   // Get signed URL for document download via Edge Function
@@ -46,8 +48,8 @@ export function usePortalDocuments(policyId?: string) {
   }, []);
 
   const refetch = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['portal-documents', policyId] });
-  }, [queryClient, policyId]);
+    queryClient.invalidateQueries({ queryKey: ['portal-documents', accountId, policyId] });
+  }, [queryClient, accountId, policyId]);
 
   return {
     documents: documentsQuery.data ?? [],

@@ -9,18 +9,20 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { PortalIDCard } from '@/types/portal';
 
-export function usePortalIDCards() {
+export function usePortalIDCards(accountId: string | null) {
   const idCardsQuery = useQuery({
-    queryKey: ['portal-id-cards'],
+    queryKey: ['portal-id-cards', accountId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('portal_id_cards')
         .select('*')
+        .eq('account_id', accountId!)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as PortalIDCard[];
     },
+    enabled: !!accountId,
   });
 
   // Get ID card image URL (view action)

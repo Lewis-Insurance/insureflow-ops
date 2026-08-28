@@ -25,11 +25,12 @@ import type { PortalIDCard } from '@/types/portal';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
 
 interface IDCardViewProps {
+  accountId: string;
   showWalletButtons?: boolean;
 }
 
-export function IDCardView({ showWalletButtons = true }: IDCardViewProps) {
-  const { idCards, isLoading, getIDCardImageUrl, downloadIDCard, getAppleWalletPass, getGoogleWalletPass } = usePortalIDCards();
+export function IDCardView({ accountId, showWalletButtons = true }: IDCardViewProps) {
+  const { idCards, isLoading, getIDCardImageUrl, downloadIDCard, getAppleWalletPass, getGoogleWalletPass } = usePortalIDCards(accountId);
   const [loadingCard, setLoadingCard] = useState<string | null>(null);
   const [cardImages, setCardImages] = useState<Record<string, string>>({});
 
