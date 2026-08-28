@@ -82,6 +82,7 @@ describe('ClusterHub', () => {
     expect(container.textContent).toContain('13');
     // cluster premium formatted from active_premium
     expect(container.textContent).toMatch(/\$56,899/);
+    expect(screen.getByText('Shared lines live on the parent account.')).toBeInTheDocument();
   });
 
   it('renders nothing when there is no real cluster (size <= 1)', () => {
