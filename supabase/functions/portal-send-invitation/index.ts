@@ -1,318 +1,223 @@
-// ============================================================================
-// PORTAL SEND INVITATION - Edge Function
-// ============================================================================
-// Sends portal invitation emails to customers
-// Creates invitation record and triggers magic link email
-// Called by staff/agents from the CustomerDetail page
-// ============================================================================
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { decidePortalInvitation } from './decision.ts';
 
 interface InvitationRequest {
   account_id: string;
+  account_ids?: string[];
   email: string;
   first_name?: string;
   last_name?: string;
-  invitation_type?: 'standard' | 'vip' | 'campaign';
-  campaign_name?: string;
 }
 
-interface InvitationResponse {
-  success: boolean;
-  invitation_id?: string;
-  message: string;
-  existing_user?: boolean;
-}
+const json = (body: unknown, status: number, headers: Record<string, string>) =>
+  new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
 
 serve(async (req) => {
-  // Handle CORS preflight
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
-
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-
-  // Only allow POST
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
   try {
-    // Get auth header - staff must be authenticated
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Authorization header required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    if (!authHeader) return json({ error: 'Authorization header required' }, 401, corsHeaders);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-
-    // Create client with user's auth token to verify they're staff
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader }
-      }
+    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
     });
+    const adminClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: authData, error: authError } = await userClient.auth.getUser();
+    if (authError || !authData.user) return json({ error: 'Invalid or expired token' }, 401, corsHeaders);
 
-    // Verify user is authenticated staff
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if user is staff
+    /* eslint-disable local/no-deprecated-domain-terms -- Existing staff-auth schema contract. */
     const { data: profile, error: profileError } = await userClient
-      .from('profiles')
-      .select('role, is_staff')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return new Response(
-        JSON.stringify({ error: 'User profile not found' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+      .from('profiles').select('role, is_staff').eq('id', authData.user.id).single();
     const staffRoles = ['admin', 'staff', 'producer', 'csr', 'owner', 'agent'];
-    if (!staffRoles.includes(profile.role) && !profile.is_staff) {
-      return new Response(
-        JSON.stringify({ error: 'Only staff members can send portal invitations' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (profileError || !profile || (!staffRoles.includes(profile.role) && !profile.is_staff)) {
+      return json({ error: 'Only staff members can send portal invitations' }, 403, corsHeaders);
+    }
+    /* eslint-enable local/no-deprecated-domain-terms */
+
+    const parsedBody: unknown = await req.json();
+    if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+      return json({ error: 'account_ids must be valid and include the invite-from account' }, 400, corsHeaders);
+    }
+    const body = parsedBody as InvitationRequest;
+    const normalizedEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const escapedEmailPattern = normalizedEmail.replace(/[\\%_]/g, '\\$&');
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const requestedAccountIds = body.account_ids === undefined ? [body.account_id] : body.account_ids;
+    const requestMalformed =
+      !uuidPattern.test(body.account_id ?? '') ||
+      !Array.isArray(requestedAccountIds) ||
+      requestedAccountIds.length === 0 ||
+      requestedAccountIds.some((id) => typeof id !== 'string' || !uuidPattern.test(id));
+    const requestedIds = Array.isArray(requestedAccountIds)
+      ? [...new Set(requestedAccountIds.filter((id): id is string => typeof id === 'string'))]
+      : [];
+    const homeIncluded = typeof body.account_id === 'string' && body.account_id.length > 0 && requestedIds.includes(body.account_id);
+    if (!homeIncluded || requestMalformed) {
+      return json({ error: 'account_ids must be valid and include the invite-from account' }, 400, corsHeaders);
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return json({ error: 'Invalid email format' }, 400, corsHeaders);
     }
 
-    // Parse request body
-    const body: InvitationRequest = await req.json();
-
-    // Validate required fields
-    if (!body.account_id || !body.email) {
-      return new Response(
-        JSON.stringify({
-          error: 'Missing required fields',
-          required: ['account_id', 'email']
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(body.email)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid email format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Use service role client for admin operations
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+    // Resolve the caller-authorized cluster allow-list before any write.
+    const { data: cluster, error: clusterError } = await userClient.rpc('list_portal_invite_cluster', {
+      p_account_id: body.account_id,
     });
-
-    // Verify account exists
-    const { data: account, error: accountError } = await adminClient
-      .from('accounts')
-      .select('id, name')
-      .eq('id', body.account_id)
-      .single();
-
-    if (accountError || !account) {
-      return new Response(
-        JSON.stringify({ error: 'Account not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (clusterError || !Array.isArray(cluster)) {
+      return json({ error: 'Account scope could not be validated' }, 403, corsHeaders);
     }
+    const allowedIds = new Set(cluster.map((row: { account_id: string }) => row.account_id));
+    if (!allowedIds.has(body.account_id)) {
+      return json({ error: 'Invite-from account is missing from the validated scope' }, 403, corsHeaders);
+    }
+    const hasForeignAccount = requestedIds.some((id) => !allowedIds.has(id));
 
-    // Check if user already has portal access
-    const { data: existingPortalUser } = await adminClient
+    // Email is the login identity. Ambiguous legacy duplicates fail closed.
+    const { data: existingUsers, error: lookupError } = await adminClient
       .from('client_portal_users')
-      .select('id, portal_status')
-      .eq('account_id', body.account_id)
-      .ilike('email', body.email)
-      .maybeSingle();
+      .select('id, account_id, email, portal_status')
+      .ilike('email', escapedEmailPattern)
+      .limit(2);
 
-    if (existingPortalUser) {
-      if (existingPortalUser.portal_status === 'active') {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'This email already has active portal access for this account.',
-            existing_user: true
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Check for existing pending invitation
-    const { data: existingInvitation } = await adminClient
+    const { data: invitationCandidates, error: invitationLookupError } = await adminClient
       .from('portal_invitations')
-      .select('id, status, sent_at')
-      .eq('account_id', body.account_id)
-      .ilike('email', body.email)
-      .in('status', ['pending', 'sent'])
-      .maybeSingle();
-
-    let invitationId: string;
-
-    if (existingInvitation) {
-      // Update existing invitation and resend
-      const { error: updateError } = await adminClient
-        .from('portal_invitations')
-        .update({
-          status: 'pending',
-          send_attempts: 0,
-          last_error: null,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-        })
-        .eq('id', existingInvitation.id);
-
-      if (updateError) {
-        console.error('Update invitation error:', updateError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to update invitation' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      invitationId = existingInvitation.id;
-    } else {
-      // Create new invitation
-      const { data: newInvitation, error: insertError } = await adminClient
-        .from('portal_invitations')
-        .insert({
-          account_id: body.account_id,
-          email: body.email.toLowerCase(),
-          invitation_type: body.invitation_type || 'standard',
-          campaign_name: body.campaign_name,
-          status: 'pending',
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-        })
-        .select('id')
-        .single();
-
-      if (insertError || !newInvitation) {
-        console.error('Insert invitation error:', insertError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to create invitation' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      invitationId = newInvitation.id;
+      .select('id, account_id, email, portal_user_id, scope_account_ids, status')
+      .ilike('email', escapedEmailPattern)
+      .limit(2);
+    const resolution = decidePortalInvitation({
+      email: normalizedEmail,
+      homeAccountId: body.account_id,
+      homeIncluded,
+      requestMalformed,
+      hasForeignAccount,
+      portalLookupFailed: !!lookupError,
+      invitationLookupFailed: !!invitationLookupError,
+      portalUsers: existingUsers ?? [],
+      invitations: invitationCandidates ?? [],
+    });
+    const { decision } = resolution;
+    if (decision === 'reject_foreign') return json({ error: 'Account scope could not be validated' }, 400, corsHeaders);
+    if (decision === 'reject_disabled') {
+      return json({ error: 'This portal login is disabled and cannot be expanded' }, 409, corsHeaders);
+    }
+    if (decision === 'reject_home_missing') {
+      return json({ error: 'account_ids must include the invite-from account' }, 400, corsHeaders);
     }
 
-    // Create or update client_portal_users entry (invited status)
-    const { data: portalUser, error: portalUserError } = await adminClient
-      .from('client_portal_users')
-      .upsert({
+    let portalUser = resolution.portalUser;
+    if (decision === 'create_new') {
+      const { data, error } = await adminClient.from('client_portal_users').insert({
         account_id: body.account_id,
-        email: body.email.toLowerCase(),
-        first_name: body.first_name || null,
-        last_name: body.last_name || null,
+        email: normalizedEmail,
+        first_name: body.first_name?.trim() || null,
+        last_name: body.last_name?.trim() || null,
         portal_status: 'invited',
         can_submit_requests: true,
         can_view_policies: true,
         can_view_documents: true,
-        can_view_claims: true
-      }, {
-        onConflict: 'account_id,email',
-        ignoreDuplicates: false
-      })
-      .select('id')
-      .single();
+        can_view_claims: true,
+      }).select('id, account_id, portal_status').single();
+      if (error || !data) return json({ error: 'Failed to create portal login' }, 500, corsHeaders);
+      portalUser = { ...data, email: normalizedEmail };
+    }
+    if (!portalUser) return json({ error: 'Portal login could not be resolved' }, 500, corsHeaders);
 
-    if (portalUserError) {
-      console.error('Portal user upsert error:', portalUserError);
-      // Don't fail - invitation was created, just log
+    const { data: currentScope, error: scopeReadError } = await adminClient
+      .from('portal_user_accounts').select('account_id').eq('portal_user_id', portalUser.id);
+    if (scopeReadError) return json({ error: 'Portal scope could not be read' }, 500, corsHeaders);
+    const currentIds = new Set((currentScope ?? []).map((row: { account_id: string }) => row.account_id));
+    const missingIds = requestedIds.filter((id) => !currentIds.has(id));
+
+    const addScope = async (accountId: string) => {
+      const { error: rpcError } = await userClient.rpc('add_portal_user_account', {
+        p_portal_user_id: portalUser!.id,
+        p_account_id: accountId,
+      });
+      if (!rpcError) return null;
+      // Safe fallback: this exact account set passed the staff-only cluster RPC above.
+      const { error: insertError } = await adminClient.from('portal_user_accounts').upsert({
+        portal_user_id: portalUser!.id,
+        account_id: accountId,
+        is_home: accountId === portalUser!.account_id,
+        created_by: authData.user!.id,
+      }, { onConflict: 'portal_user_id,account_id' });
+      return insertError;
+    };
+    for (const accountId of missingIds) {
+      if (await addScope(accountId)) return json({ error: 'Failed to expand portal scope' }, 500, corsHeaders);
     }
 
-    // Generate magic link for portal registration
-    const portalUrl = Deno.env.get('PORTAL_URL') || 'https://www.lewisinsurance.com';
-    const redirectTo = `${portalUrl}/portal/callback?invitation=${invitationId}`;
+    if (decision === 'expand_active') {
+      return json({
+        success: true,
+        existing_user: true,
+        message: `Added ${missingIds.length} accounts to the existing portal login`,
+      }, 200, corsHeaders);
+    }
 
+    // Pending refresh stays on the original home and only adds to prior scope.
+    const scopeAccountIds = [...new Set([portalUser.account_id, ...currentIds, ...requestedIds])];
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    let invitationId: string;
+    if (resolution.invitation) {
+      invitationId = resolution.invitation.id;
+      const priorScope = Array.isArray(resolution.invitation.scope_account_ids)
+        ? resolution.invitation.scope_account_ids
+        : [];
+      const { error } = await adminClient.from('portal_invitations').update({
+        account_id: portalUser.account_id,
+        portal_user_id: portalUser.id,
+        scope_account_ids: [...new Set([...priorScope, ...scopeAccountIds])],
+        status: 'pending',
+        expires_at: expiresAt,
+        send_attempts: 0,
+        last_error: null,
+      }).eq('id', invitationId);
+      if (error) return json({ error: 'Failed to refresh invitation' }, 500, corsHeaders);
+    } else {
+      const { data, error } = await adminClient.from('portal_invitations').insert({
+        account_id: portalUser.account_id,
+        portal_user_id: portalUser.id,
+        email: normalizedEmail,
+        invitation_type: 'standard',
+        status: 'pending',
+        scope_account_ids: scopeAccountIds,
+        expires_at: expiresAt,
+      }).select('id').single();
+      if (error || !data) return json({ error: 'Failed to create invitation' }, 500, corsHeaders);
+      invitationId = data.id;
+    }
+
+    const portalUrl = Deno.env.get('PORTAL_URL') || 'https://www.lewisinsurance.com';
     const { error: magicLinkError } = await adminClient.auth.admin.generateLink({
       type: 'magiclink',
-      email: body.email,
-      options: {
-        redirectTo
-      }
+      email: normalizedEmail,
+      options: { redirectTo: `${portalUrl}/portal/callback?invitation=${invitationId}` },
     });
+    const { error: statusUpdateError } = await adminClient.from('portal_invitations').update(magicLinkError ? {
+      status: 'pending', send_attempts: 1, last_error: 'Magic link generation failed',
+    } : {
+      status: 'sent', sent_at: new Date().toISOString(), sent_via: 'magic_link', send_attempts: 1, last_error: null,
+    }).eq('id', invitationId);
+    if (statusUpdateError) return json({ error: 'Failed to persist invitation delivery status' }, 500, corsHeaders);
 
-    if (magicLinkError) {
-      console.error('Magic link generation error:', magicLinkError);
-
-      // Update invitation with error
-      await adminClient
-        .from('portal_invitations')
-        .update({
-          status: 'pending',
-          last_error: magicLinkError.message,
-          send_attempts: 1
-        })
-        .eq('id', invitationId);
-
-      // Still return success since invitation was created
-      // The magic link can be resent later
-    } else {
-      // Update invitation status to sent
-      await adminClient
-        .from('portal_invitations')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          sent_via: 'magic_link',
-          send_attempts: 1
-        })
-        .eq('id', invitationId);
-    }
-
-    const response: InvitationResponse = {
+    return json({
       success: true,
       invitation_id: invitationId,
-      message: magicLinkError
-        ? 'Invitation created but email delivery may be delayed. The customer will receive an email shortly.'
-        : `Portal invitation sent to ${body.email}. They will receive an email with a link to access the portal.`
-    };
-
-    return new Response(
-      JSON.stringify(response),
-      {
-        status: 201,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-
+      message: magicLinkError ? 'Invitation created but email delivery may be delayed.' : 'Portal invitation sent.',
+    }, 201, corsHeaders);
   } catch (error) {
-    console.error('Portal send invitation error:', error);
-
-    // Handle JSON parse errors
-    if (error instanceof SyntaxError) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON in request body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    if (error instanceof SyntaxError) return json({ error: 'Invalid JSON in request body' }, 400, corsHeaders);
+    console.error('Portal invitation request failed');
+    return json({ error: 'Internal server error' }, 500, corsHeaders);
   }
 });
