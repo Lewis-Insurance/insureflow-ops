@@ -41756,6 +41756,17 @@ export type Database = {
           policy_id: string
         }
       }
+      add_portal_user_account: {
+        Args: { p_account_id: string; p_portal_user_id: string }
+        Returns: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_home: boolean
+          portal_user_id: string
+        }
+      }
       list_account_policies: {
         Args: { p_account_id: string }
         Returns: {
@@ -41780,6 +41791,16 @@ export type Database = {
           account_id: string
           created_at: string
           name: string
+        }[]
+      }
+      list_portal_invite_cluster: {
+        Args: { p_account_id: string }
+        Returns: {
+          account_id: string
+          default_selected: boolean
+          is_business: boolean
+          name: string
+          node_role: string
         }[]
       }
       remove_policy_named_insured: {
