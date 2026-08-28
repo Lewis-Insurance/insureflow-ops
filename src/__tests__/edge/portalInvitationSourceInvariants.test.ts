@@ -93,6 +93,7 @@ describe('portal-send-invitation source invariants', () => {
     expect(source).toContain("Deno.env.get('RESEND_API_KEY')");
     expect(source).toContain('await sendPortalInvitation(normalizedEmail, actionLink)');
     expect(source).toContain('action_link: actionLink ?? null');
+    expect(source).toContain("return { success: false, error: 'Email provider request failed' }");
     expect(source).not.toMatch(/console\.(?:log|info|error|warn)\([^\n]*(?:actionLink|action_link|normalizedEmail)/);
   });
 

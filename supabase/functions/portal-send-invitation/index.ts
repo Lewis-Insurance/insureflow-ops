@@ -24,20 +24,24 @@ async function sendPortalInvitation(email: string, actionLink: string) {
   const apiKey = Deno.env.get('RESEND_API_KEY');
   if (!apiKey) return { success: false, error: 'Email delivery is not configured' };
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: `Lewis Insurance <${Deno.env.get('OUTBOUND_FROM') || 'service@lewisinsurance.ai'}>`,
-      to: [email],
-      subject: 'Your Lewis Insurance client portal invitation',
-      html: `<p>You have been invited to the Lewis Insurance client portal.</p><p><a href="${escapeHtml(actionLink)}">Accept invitation</a></p><p>This invitation expires in 30 days.</p>`,
-    }),
-  });
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: `Lewis Insurance <${Deno.env.get('OUTBOUND_FROM') || 'service@lewisinsurance.ai'}>`,
+        to: [email],
+        subject: 'Your Lewis Insurance client portal invitation',
+        html: `<p>You have been invited to the Lewis Insurance client portal.</p><p><a href="${escapeHtml(actionLink)}">Accept invitation</a></p><p>This invitation expires in 30 days.</p>`,
+      }),
+    });
 
-  return response.ok
-    ? { success: true, error: null }
-    : { success: false, error: `Email provider returned HTTP ${response.status}` };
+    return response.ok
+      ? { success: true, error: null }
+      : { success: false, error: `Email provider returned HTTP ${response.status}` };
+  } catch {
+    return { success: false, error: 'Email provider request failed' };
+  }
 }
 
 serve(async (req) => {
