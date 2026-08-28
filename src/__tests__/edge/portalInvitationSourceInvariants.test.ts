@@ -86,4 +86,22 @@ describe('portal-send-invitation source invariants', () => {
     expect(source).toContain('const { error: statusUpdateError }');
     expect(source).toContain("if (statusUpdateError) return json({ error: 'Failed to persist invitation delivery status' }");
   });
+
+  it('captures and sends the generated action link through the existing Resend provider', () => {
+    expect(source).toContain('magicLinkData?.properties?.action_link');
+    expect(source).toContain("fetch('https://api.resend.com/emails'");
+    expect(source).toContain("Deno.env.get('RESEND_API_KEY')");
+    expect(source).toContain('await sendPortalInvitation(normalizedEmail, actionLink)');
+    expect(source).toContain('action_link: actionLink ?? null');
+    expect(source).not.toMatch(/console\.(?:log|info|error|warn)\([^\n]*(?:actionLink|action_link|normalizedEmail)/);
+  });
+
+  it('uses the generated action link for delivery and returns it as a staff fallback', () => {
+    expect(source).toContain('magicLinkData?.properties?.action_link');
+    expect(source).toContain('await sendPortalInvitation(normalizedEmail, actionLink)');
+    expect(source).toContain('action_link: actionLink ?? null');
+    expect(source).toContain("Deno.env.get('RESEND_API_KEY')");
+    expect(source).toContain("fetch('https://api.resend.com/emails'");
+    expect(source).not.toMatch(/console\.(?:log|info|warn|error)[^\n]*(?:actionLink|normalizedEmail)/);
+  });
 });

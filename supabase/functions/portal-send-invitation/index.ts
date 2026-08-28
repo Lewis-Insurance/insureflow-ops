@@ -14,6 +14,32 @@ interface InvitationRequest {
 const json = (body: unknown, status: number, headers: Record<string, string>) =>
   new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
 
+const escapeHtml = (value: string) => value
+  .replaceAll('&', '&amp;')
+  .replaceAll('"', '&quot;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;');
+
+async function sendPortalInvitation(email: string, actionLink: string) {
+  const apiKey = Deno.env.get('RESEND_API_KEY');
+  if (!apiKey) return { success: false, error: 'Email delivery is not configured' };
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: `Lewis Insurance <${Deno.env.get('OUTBOUND_FROM') || 'service@lewisinsurance.ai'}>`,
+      to: [email],
+      subject: 'Your Lewis Insurance client portal invitation',
+      html: `<p>You have been invited to the Lewis Insurance client portal.</p><p><a href="${escapeHtml(actionLink)}">Accept invitation</a></p><p>This invitation expires in 30 days.</p>`,
+    }),
+  });
+
+  return response.ok
+    ? { success: true, error: null }
+    : { success: false, error: `Email provider returned HTTP ${response.status}` };
+}
+
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -198,13 +224,17 @@ serve(async (req) => {
     }
 
     const portalUrl = Deno.env.get('PORTAL_URL') || 'https://www.lewisinsurance.com';
-    const { error: magicLinkError } = await adminClient.auth.admin.generateLink({
+    const { data: magicLinkData, error: magicLinkError } = await adminClient.auth.admin.generateLink({
       type: 'magiclink',
       email: normalizedEmail,
       options: { redirectTo: `${portalUrl}/portal/callback?invitation=${invitationId}` },
     });
-    const { error: statusUpdateError } = await adminClient.from('portal_invitations').update(magicLinkError ? {
-      status: 'pending', send_attempts: 1, last_error: 'Magic link generation failed',
+    const actionLink = magicLinkData?.properties?.action_link;
+    const delivery = !magicLinkError && actionLink
+      ? await sendPortalInvitation(normalizedEmail, actionLink)
+      : { success: false, error: 'Magic link generation failed' };
+    const { error: statusUpdateError } = await adminClient.from('portal_invitations').update(!delivery.success ? {
+      status: 'pending', send_attempts: 1, last_error: delivery.error,
     } : {
       status: 'sent', sent_at: new Date().toISOString(), sent_via: 'magic_link', send_attempts: 1, last_error: null,
     }).eq('id', invitationId);
@@ -213,7 +243,8 @@ serve(async (req) => {
     return json({
       success: true,
       invitation_id: invitationId,
-      message: magicLinkError ? 'Invitation created but email delivery may be delayed.' : 'Portal invitation sent.',
+      action_link: actionLink ?? null,
+      message: delivery.success ? 'Portal invitation sent.' : 'Invitation created but email delivery may be delayed.',
     }, 201, corsHeaders);
   } catch (error) {
     if (error instanceof SyntaxError) return json({ error: 'Invalid JSON in request body' }, 400, corsHeaders);
