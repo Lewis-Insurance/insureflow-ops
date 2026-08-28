@@ -35,6 +35,7 @@ import { CancellationHolderList } from '@/components/certificates/CancellationHo
 import { useCancellationHolders } from '@/hooks/useCancellationHolders';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { PolicyCoveragePanel } from '@/components/policies/PolicyCoveragePanel';
+import { PolicyNamedInsuredAccounts } from '@/components/policies/PolicyNamedInsuredAccounts';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -76,7 +77,8 @@ export default function PolicyDetail() {
               name,
               type,
               email,
-              phone
+              phone,
+              agency_workspace_id
             ),
             carrier_info:carriers!policies_carrier_id_fkey(
               id,
@@ -352,6 +354,17 @@ export default function PolicyDetail() {
                   </div>
                 )}
               </div>
+            )}
+
+            {policy.account?.agency_workspace_id && policyId && (
+              <PolicyNamedInsuredAccounts
+                policyId={policyId}
+                ownerAccount={{
+                  id: policy.account.id,
+                  name: policy.account.name,
+                  agency_workspace_id: policy.account.agency_workspace_id,
+                }}
+              />
             )}
 
             {/* All core policy fields in one dense grid (no per-group separators,
