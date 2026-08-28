@@ -63,17 +63,18 @@ const REQUEST_TYPES: { value: ServiceRequestType; label: string; icon: React.Rea
 ];
 
 interface ServiceRequestFormProps {
+  accountId: string;
   policyId?: string;
   onSuccess?: (requestId: string) => void;
 }
 
-export function ServiceRequestForm({ policyId, onSuccess }: ServiceRequestFormProps) {
+export function ServiceRequestForm({ accountId, policyId, onSuccess }: ServiceRequestFormProps) {
   const [step, setStep] = useState<'type' | 'details' | 'success'>('type');
   const [requestType, setRequestType] = useState<ServiceRequestType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
 
-  const { createRequest } = useServiceRequests();
+  const { createRequest } = useServiceRequests(accountId);
 
   const form = useForm<ServiceRequestFormValues>({
     resolver: zodResolver(serviceRequestSchema),

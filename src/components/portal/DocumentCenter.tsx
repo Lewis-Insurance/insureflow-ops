@@ -43,11 +43,12 @@ const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
 };
 
 interface DocumentCenterProps {
+  accountId: string;
   policyId?: string;
 }
 
-export function DocumentCenter({ policyId }: DocumentCenterProps) {
-  const { documents, isLoading, getDocumentUrl } = usePortalDocuments(policyId);
+export function DocumentCenter({ accountId, policyId }: DocumentCenterProps) {
+  const { documents, isLoading, getDocumentUrl } = usePortalDocuments(accountId, policyId);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [loadingDoc, setLoadingDoc] = useState<string | null>(null);

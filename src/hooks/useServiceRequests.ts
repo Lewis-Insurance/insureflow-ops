@@ -13,20 +13,22 @@ import type {
   ServiceRequestType,
 } from '@/types/portal';
 
-export function useServiceRequests() {
+export function useServiceRequests(accountId: string | null) {
   const queryClient = useQueryClient();
 
   const requestsQuery = useQuery({
-    queryKey: ['portal-service-requests'],
+    queryKey: ['portal-service-requests', accountId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('portal_service_requests')
         .select('*')
+        .eq('account_id', accountId!)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as PortalServiceRequest[];
     },
+    enabled: !!accountId,
   });
 
   // Create service request via RPC
@@ -38,19 +40,24 @@ export function useServiceRequests() {
       policy_id?: string | null;
       prefilled_data?: Record<string, unknown> | null;
     }) => {
+      if (!accountId) {
+        throw new Error('Select an accessible account before creating a service request');
+      }
+
       const { data, error } = await supabase.rpc('create_my_service_request', {
         p_request_type: params.request_type,
         p_request_title: params.request_title,
         p_request_data: params.request_data,
         p_policy_id: params.policy_id ?? null,
         p_prefilled_data: params.prefilled_data ?? null,
+        p_account_id: accountId,
       });
 
       if (error) throw error;
       return data as string;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portal-service-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['portal-service-requests', accountId] });
     },
   });
 

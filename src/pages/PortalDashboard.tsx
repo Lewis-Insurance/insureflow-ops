@@ -23,15 +23,26 @@ import {
   Gift,
   AlertTriangle,
   ExternalLink,
+  Building2,
 } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { IDCardView } from '@/components/portal/IDCardView';
 import { DocumentCenter } from '@/components/portal/DocumentCenter';
 import { ServiceRequestForm } from '@/components/portal/ServiceRequestForm';
 import { POLICY_DATA_DISCLAIMER } from '@/types/portal';
+import { usePortalAccounts } from '@/hooks/usePortalAccounts';
+import { PortalPolicies } from '@/components/portal/PortalPolicies';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function PortalDashboard() {
   const { user, branding, loading, signOut, isAuthenticated } = usePortalAuth();
+  const { accounts, activeAccountId, selectAccount, isLoading: accountsLoading, error: accountsError } = usePortalAccounts();
   const [activeTab, setActiveTab] = useState('id-cards');
 
   if (loading) {
@@ -54,7 +65,7 @@ export default function PortalDashboard() {
       {/* Header */}
       <header className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               {branding?.logo_url && (
                 <img
@@ -70,16 +81,48 @@ export default function PortalDashboard() {
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              {accountsLoading ? (
+                <Skeleton className="h-9 w-56" />
+              ) : accounts.length > 0 ? (
+                <Select value={activeAccountId ?? undefined} onValueChange={selectAccount}>
+                  <SelectTrigger className="w-full min-w-56 sm:w-64" aria-label="Active account">
+                    <Building2 className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Select an account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.account_id} value={account.account_id}>
+                        {account.name}{account.is_home ? ' (Home)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+              <Button variant="ghost" size="sm" onClick={signOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {accountsError && (
+          <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+            <p className="font-medium text-destructive">Your accounts could not be loaded</p>
+            <p className="mt-1 text-sm text-muted-foreground">Refresh the page or contact your agency if this continues.</p>
+          </div>
+        )}
+        {!accountsLoading && !accountsError && accounts.length === 0 && (
+          <div role="status" className="rounded-lg border bg-white p-6 text-center">
+            <p className="font-medium">No portal accounts are available</p>
+            <p className="mt-1 text-sm text-muted-foreground">Contact your agency to restore portal access.</p>
+          </div>
+        )}
+        {activeAccountId && <>
         {/* Disclaimer Banner */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
@@ -121,7 +164,11 @@ export default function PortalDashboard() {
 
         {/* Tabs Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full h-auto">
+            <TabsTrigger value="policies">
+              <Shield className="h-4 w-4 mr-2" />
+              Policies
+            </TabsTrigger>
             <TabsTrigger value="id-cards">
               <Smartphone className="h-4 w-4 mr-2" />
               ID Cards
@@ -141,16 +188,19 @@ export default function PortalDashboard() {
           </TabsList>
 
           <div className="mt-6">
+            <TabsContent value="policies">
+              <PortalPolicies key={activeAccountId} accountId={activeAccountId} />
+            </TabsContent>
             <TabsContent value="id-cards">
-              <IDCardView showWalletButtons={branding?.features_enabled?.apple_wallet || branding?.features_enabled?.google_wallet} />
+              <IDCardView key={activeAccountId} accountId={activeAccountId} showWalletButtons={branding?.features_enabled?.apple_wallet || branding?.features_enabled?.google_wallet} />
             </TabsContent>
 
             <TabsContent value="documents">
-              <DocumentCenter />
+              <DocumentCenter key={activeAccountId} accountId={activeAccountId} />
             </TabsContent>
 
             <TabsContent value="service-requests">
-              <ServiceRequestForm />
+              <ServiceRequestForm key={activeAccountId} accountId={activeAccountId} />
             </TabsContent>
 
             <TabsContent value="household">
@@ -173,6 +223,7 @@ export default function PortalDashboard() {
             </TabsContent>
           </div>
         </Tabs>
+        </>}
 
         {/* Footer */}
         <footer className="border-t pt-6 mt-8">
