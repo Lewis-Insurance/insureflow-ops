@@ -41767,6 +41767,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_portal_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: Database["public"]["Tables"]["client_portal_users"]["Row"]
+      }
       add_policy_named_insured: {
         Args: { p_account_id: string; p_policy_id: string }
         Returns: {
