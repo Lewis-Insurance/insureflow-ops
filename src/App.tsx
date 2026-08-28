@@ -93,6 +93,7 @@ const ReportIssue = lazyWithRetry(() => import("./pages/ReportIssue"));
 const IssueDetail = lazyWithRetry(() => import("./pages/IssueDetail"));
 const PredictiveAnalytics = lazyWithRetry(() => import("./pages/PredictiveAnalytics"));
 const PortalLoginPage = lazyWithRetry(() => import("./pages/PortalLoginPage"));
+const PortalCallbackPage = lazyWithRetry(() => import("./pages/PortalCallbackPage"));
 const PortalDashboard = lazyWithRetry(() => import("./pages/PortalDashboard"));
 const MarketingAutomationsPage = lazyWithRetry(() => import("./pages/MarketingAutomationsPage"));
 const AutomationBuilderPage = lazyWithRetry(() => import("./pages/AutomationBuilderPage"));
@@ -1075,6 +1076,14 @@ const App = () => (
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
                       <PortalLoginPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/portal/callback"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PortalCallbackPage />
                     </ErrorBoundary>
                   }
                 />
