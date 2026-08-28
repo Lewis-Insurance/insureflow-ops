@@ -41746,6 +41746,16 @@ export type Database = {
       }
     }
     Functions: {
+      add_policy_named_insured: {
+        Args: { p_account_id: string; p_policy_id: string }
+        Returns: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          policy_id: string
+        }
+      }
       list_account_policies: {
         Args: { p_account_id: string }
         Returns: {
@@ -41763,6 +41773,18 @@ export type Database = {
           premium: number | null
           status: string | null
         }[]
+      }
+      list_policy_named_insureds: {
+        Args: { p_policy_id: string }
+        Returns: {
+          account_id: string
+          created_at: string
+          name: string
+        }[]
+      }
+      remove_policy_named_insured: {
+        Args: { p_account_id: string; p_policy_id: string }
+        Returns: boolean
       }
       _customer_merge_column_exists: {
         Args: { p_column_name: string; p_table_name: string }

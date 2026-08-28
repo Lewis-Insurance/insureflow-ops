@@ -40,6 +40,8 @@ interface CustomerSearchSelectProps {
   error?: string;
   disabled?: boolean;
   id?: string;
+  agencyWorkspaceId?: string;
+  excludedAccountIds?: string[];
 }
 
 /**
@@ -56,6 +58,8 @@ export function CustomerSearchSelect({
   error,
   disabled = false,
   id,
+  agencyWorkspaceId,
+  excludedAccountIds = [],
 }: CustomerSearchSelectProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = searchOpen ?? internalOpen;
@@ -69,13 +73,21 @@ export function CustomerSearchSelect({
   }, [search]);
 
   const { data: accounts = [], isLoading, isError } = useQuery({
-    queryKey: ['customer-search-select', debouncedSearch],
+    queryKey: ['customer-search-select', debouncedSearch, agencyWorkspaceId, excludedAccountIds],
     queryFn: async () => {
       let query = supabase
         .from('accounts')
         .select('id, name, type, email, phone')
         .is('deleted_at', null)
         .order('name');
+
+      if (agencyWorkspaceId) {
+        query = query.eq('agency_workspace_id', agencyWorkspaceId);
+      }
+
+      if (excludedAccountIds.length > 0) {
+        query = query.not('id', 'in', `(${excludedAccountIds.join(',')})`);
+      }
 
       if (debouncedSearch.trim()) {
         // Sanitized + quoted: a raw comma ("Smith, John") breaks the PostgREST
