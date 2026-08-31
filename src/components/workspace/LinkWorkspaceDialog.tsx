@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Loader2, Building2, UserPlus, FileText, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeMultiFieldSearch } from '@/lib/sanitize';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import type { WorkspaceWithEntities } from '@/types/workspace';
@@ -34,7 +35,7 @@ function useAccountsSearch(query: string) {
             const { data, error } = await supabase
                 .from('accounts')
                 .select('id, name, email, type')
-                .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
+                .or(sanitizeMultiFieldSearch(query, ['name', 'email']))
                 .order('name')
                 .limit(20);
             if (error) throw error;
@@ -61,7 +62,7 @@ function useLeadsSearch(query: string) {
             const { data, error } = await supabase
                 .from('leads')
                 .select('id, first_name, last_name, email, status, company_name')
-                .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%,company_name.ilike.%${query}%`)
+                .or(sanitizeMultiFieldSearch(query, ['first_name', 'last_name', 'email', 'company_name']))
                 .order('first_name')
                 .limit(20);
             if (error) throw error;
@@ -79,6 +80,8 @@ function usePoliciesSearch(query: string) {
                 const { data, error } = await supabase
                     .from('policies')
                     .select('id, policy_number, line_of_business, status, carrier:carriers(name)')
+                    // Merge-tombstoned policies must never be offered for linking.
+                    .is('deleted_at', null)
                     .order('updated_at', { ascending: false })
                     .limit(10);
                 if (error) throw error;
@@ -88,7 +91,10 @@ function usePoliciesSearch(query: string) {
             const { data, error } = await supabase
                 .from('policies')
                 .select('id, policy_number, line_of_business, status, carrier:carriers(name)')
-                .or(`policy_number.ilike.%${query}%,line_of_business.ilike.%${query}%`)
+                .is('deleted_at', null)
+                // Sanitized + quoted: a raw comma in the term breaks the PostgREST
+                // .or() grammar and would silently return zero rows.
+                .or(sanitizeMultiFieldSearch(query, ['policy_number', 'line_of_business']))
                 .order('policy_number')
                 .limit(20);
             if (error) throw error;

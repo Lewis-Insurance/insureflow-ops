@@ -21,6 +21,7 @@ import {
 import { CalendarIcon, Search, X, Loader2 } from 'lucide-react';
 import { Task, TaskCategory, TaskPriority, TaskStatus } from '@/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeMultiFieldSearch } from '@/lib/sanitize';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
@@ -60,6 +61,9 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
   const [policies, setPolicies] = useState<any[]>([]);
   const [selectedPolicy, setSelectedPolicy] = useState<any>(null);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  // Load failures must read differently from a genuinely empty result.
+  const [customersError, setCustomersError] = useState(false);
+  const [policiesError, setPoliciesError] = useState(false);
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -142,18 +146,25 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
       }
 
       setLoadingCustomers(true);
+      setCustomersError(false);
       try {
         const { data, error } = await supabase
           .from('accounts')
           .select('id, name, email, phone')
-          .or(`name.ilike.%${customerSearch}%,email.ilike.%${customerSearch}%,phone.ilike.%${customerSearch}%`)
+          // Merge-tombstoned duplicates must never be offered as a task target.
+          .is('deleted_at', null)
+          // Sanitized + quoted: a raw comma ("Smith, John") breaks the PostgREST
+          // .or() grammar and would silently return zero rows.
+          .or(sanitizeMultiFieldSearch(customerSearch, ['name', 'email', 'phone']))
           .limit(10);
 
-        if (!error) {
-          setCustomers(data || []);
-        }
+        if (error) throw error;
+        setCustomers(data || []);
       } catch (error) {
         console.error('Error searching customers:', error);
+        // An empty list must mean "no match", never "the query failed".
+        setCustomers([]);
+        setCustomersError(true);
       } finally {
         setLoadingCustomers(false);
       }
@@ -171,18 +182,31 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
         return;
       }
 
+      setPoliciesError(false);
       try {
-        const { data, error } = await supabase
-          .from('policies')
-          .select('id, policy_number, line_of_business, carrier')
-          .eq('account_id', selectedCustomer.id)
-          .order('policy_number');
+        // list_account_policies matches the customer record: it includes policies
+        // this account is a Named Insured on and excludes soft-deleted policies.
+        const { data, error } = await supabase.rpc('list_account_policies', {
+          p_account_id: selectedCustomer.id,
+        });
 
-        if (!error) {
-          setPolicies(data || []);
-        }
+        if (error) throw error;
+        const rows = ((data || []) as any[])
+          .map((row) => ({
+            id: row.id,
+            policy_number: row.policy_number,
+            line_of_business: row.line_of_business,
+            carrier: row.carrier_name,
+            membership: row.membership === 'named_insured' ? 'named_insured' : 'owner',
+            owner_account_name: row.owner_account_name,
+          }))
+          .sort((a, b) => (a.policy_number || '').localeCompare(b.policy_number || ''));
+        setPolicies(rows);
       } catch (error) {
         console.error('Error loading policies:', error);
+        // An empty list must mean "no policies", never "the query failed".
+        setPolicies([]);
+        setPoliciesError(true);
       }
     };
 
@@ -282,6 +306,8 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
                         <CommandList>
                           {loadingCustomers ? (
                             <CommandEmpty>Searching...</CommandEmpty>
+                          ) : customersError ? (
+                            <CommandEmpty>Could not search customers. Try again.</CommandEmpty>
                           ) : customers.length === 0 && customerSearch.length >= 2 ? (
                             <CommandEmpty>No customers found</CommandEmpty>
                           ) : customers.length === 0 ? (
@@ -316,10 +342,14 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
             )}
 
             {/* Policy Selection */}
-            {selectedCustomer && policies.length > 0 && (
+            {selectedCustomer && (policies.length > 0 || policiesError) && (
               <div>
                 <FormLabel>Policy (Optional)</FormLabel>
-                {selectedPolicy ? (
+                {policiesError ? (
+                  <p className="mt-2 text-sm text-destructive">
+                    Could not load policies for this customer. Retry before saving.
+                  </p>
+                ) : selectedPolicy ? (
                   <div className="flex items-center gap-2 p-3 bg-muted rounded-md mt-2">
                     <div className="flex-1">
                       <div className="font-medium">{selectedPolicy.policy_number}</div>
@@ -351,6 +381,9 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
                       {policies.map((policy) => (
                         <SelectItem key={policy.id} value={policy.id}>
                           {policy.policy_number} - {policy.line_of_business}
+                          {policy.membership === 'named_insured' && policy.owner_account_name
+                            ? ` (shared - ${policy.owner_account_name})`
+                            : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
