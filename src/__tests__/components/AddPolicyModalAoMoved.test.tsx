@@ -99,9 +99,9 @@ const STATUS_ONLY_LABEL = 'Only change status';
 
 function renderModal(props: Partial<React.ComponentProps<typeof AddPolicyModal>> = {}) {
   const onOpenChange = vi.fn();
-  const onAfterSave = vi.fn<[AddPolicyAfterSaveContext], Promise<void>>().mockResolvedValue(undefined);
+  const onAfterSave = vi.fn<(context: AddPolicyAfterSaveContext) => Promise<void>>().mockResolvedValue(undefined);
   const onSecondaryAction = vi
-    .fn<[AddPolicySecondaryActionContext], Promise<void>>()
+    .fn<(context: AddPolicySecondaryActionContext) => Promise<void>>()
     .mockResolvedValue(undefined);
 
   render(
@@ -194,7 +194,7 @@ describe('AddPolicyModal, AO Moved path', () => {
 
   it('retries with the values captured at the failure, not the edited form', async () => {
     const onAfterSave = vi
-      .fn<[AddPolicyAfterSaveContext], Promise<void>>()
+      .fn<(context: AddPolicyAfterSaveContext) => Promise<void>>()
       .mockRejectedValueOnce(new Error('renewal update failed'))
       .mockResolvedValueOnce(undefined);
 
