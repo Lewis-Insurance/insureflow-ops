@@ -22,6 +22,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+// The policy dropdown below calls supabase directly; without this import the
+// New Rate Watch form threw "supabase is not defined" as soon as a customer
+// was picked.
+import { supabase } from '@/integrations/supabase/client';
 import { ClientSelector } from '@/components/client/ClientSelector';
 import {
   ArrowLeft,
@@ -155,6 +159,8 @@ export default function RenewalRateWatchPage() {
         .from('policies')
         .select('id, policy_number, line_of_business')
         .eq('account_id', selectedAccountId)
+        // Merge-tombstoned policies must never be offered for a rate watch.
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw new Error(`Failed to load policies: ${error.message}`);

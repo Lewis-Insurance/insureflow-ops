@@ -48,15 +48,21 @@ export function AdvancedFilters({ filters, onFiltersChange, onSaveView }: Advanc
       }
 
       // Fetch customers (accounts)
-      const { data: customerData } = await supabase
+      const { data: customerData, error: customerError } = await supabase
         .from('accounts')
         .select('id, name')
+        // Merge-tombstoned duplicates must never appear as a filter option.
+        .is('deleted_at', null)
         .order('name')
         .limit(100);
-      
-      if (customerData) {
-        setCustomers(customerData.map(c => ({ id: c.id, name: c.name })));
+
+      if (customerError) {
+        console.error('Error loading customer filter options:', customerError);
+        setCustomers([]);
+        return;
       }
+
+      setCustomers((customerData || []).map(c => ({ id: c.id, name: c.name })));
     };
 
     fetchFilterData();
@@ -68,6 +74,8 @@ export function AdvancedFilters({ filters, onFiltersChange, onSaveView }: Advanc
       let query = supabase
         .from('policies')
         .select('id, policy_number, account_id')
+        // Soft-deleted policies must never appear as a filter option.
+        .is('deleted_at', null)
         .order('policy_number')
         .limit(100);
 
@@ -76,11 +84,16 @@ export function AdvancedFilters({ filters, onFiltersChange, onSaveView }: Advanc
         query = query.in('account_id', filters.accountId);
       }
 
-      const { data: policyData } = await query;
-      
-      if (policyData) {
-        setPolicies(policyData.map(p => ({ id: p.id, policy_number: p.policy_number })));
+      const { data: policyData, error } = await query;
+
+      if (error) {
+        // Discarding this made an RLS failure look like a book with no policies.
+        console.error('Error loading policy filter options:', error);
+        setPolicies([]);
+        return;
       }
+
+      setPolicies((policyData || []).map(p => ({ id: p.id, policy_number: p.policy_number })));
     };
 
     fetchPolicies();
