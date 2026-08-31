@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { todayLocalDate } from '@/lib/date/localDate';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,9 +32,12 @@ import type { PaidTo, PremiumPayment } from '@/types/payments';
 
 interface Policy {
   id: string;
-  policy_number: string;
-  carrier: string | null;
+  policy_number: string | null;
+  carrier_name: string | null;
   account_id: string;
+  /** 'named_insured' rows are policies owned by another account in the cluster. */
+  membership: 'owner' | 'named_insured';
+  owner_account_name: string | null;
 }
 
 interface PaymentMethod {
@@ -47,6 +50,9 @@ interface PaymentMethod {
 interface CustomerOption {
   id: string;
   name: string;
+  /** Why this row matched: 'name', 'goes by Lance', 'aka ...', 'email', 'fuzzy: ...'. */
+  match_reason: string | null;
+  policies_count: number | null;
 }
 
 export interface RecordPaymentFormProps {
@@ -101,9 +107,12 @@ export function RecordPaymentForm({
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
+  // Monotonic guard so a slow search response cannot overwrite a newer one.
+  const customerSearchSeq = useRef(0);
 
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loadingPolicies, setLoadingPolicies] = useState(false);
+  const [policiesError, setPoliciesError] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   const [formData, setFormData] = useState({
@@ -157,50 +166,92 @@ export function RecordPaymentForm({
   }, []);
 
   // Load policies whenever the selected customer changes.
+  // Uses list_account_policies so the list matches the customer record: it
+  // includes policies this account is a Named Insured on (owned by another
+  // account in the cluster) and excludes soft-deleted policies.
   useEffect(() => {
     if (!selectedAccountId) {
       setPolicies([]);
+      setPoliciesError(false);
       return;
     }
     let cancelled = false;
     setLoadingPolicies(true);
+    setPoliciesError(false);
     (async () => {
-      const { data, error } = await supabase
-        .from('policies')
-        .select('id, policy_number, carrier, account_id')
-        .eq('account_id', selectedAccountId)
-        .order('policy_number');
-      if (!cancelled) {
-        if (!error) setPolicies(data || []);
-        setLoadingPolicies(false);
+      const { data, error } = await supabase.rpc('list_account_policies', {
+        p_account_id: selectedAccountId,
+      });
+      if (cancelled) return;
+      if (error) {
+        setPolicies([]);
+        setPoliciesError(true);
+        toast({
+          title: 'Could not load policies',
+          description: error.message || 'Retry before recording this payment.',
+          variant: 'destructive',
+        });
+      } else {
+        const rows = ((data || []) as any[]).map((row) => ({
+          id: row.id,
+          policy_number: row.policy_number,
+          carrier_name: row.carrier_name,
+          account_id: row.account_id,
+          membership: row.membership === 'named_insured' ? 'named_insured' : 'owner',
+          owner_account_name: row.owner_account_name,
+        })) as Policy[];
+        rows.sort((a, b) => (a.policy_number || '').localeCompare(b.policy_number || ''));
+        setPolicies(rows);
       }
+      setLoadingPolicies(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [selectedAccountId]);
+  }, [selectedAccountId, toast]);
 
   // Customer search (debounced) — only when not locked to a customer.
+  // Uses search_accounts (the same RPC the Link drawer uses) so a middle
+  // initial, a "goes by" name, an alias, an email or a phone still finds the
+  // customer. A plain name ILIKE missed all of those.
   useEffect(() => {
     if (lockedCustomer) return;
-    if (customerSearch.trim().length < 2) {
+    const term = customerSearch.trim();
+    if (term.length < 2) {
       setCustomers([]);
+      setSearchingCustomers(false);
       return;
     }
     setSearchingCustomers(true);
+    const seq = ++customerSearchSeq.current;
     const t = setTimeout(async () => {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('id, name')
-        .ilike('name', `%${customerSearch}%`)
-        .is('deleted_at', null)
-        .order('name')
-        .limit(20);
-      if (!error) setCustomers(data || []);
+      const { data, error } = await supabase.rpc('search_accounts', {
+        p_q: term,
+        p_limit: 20,
+      });
+      // Monotonic guard: a slow older response must not overwrite a newer one.
+      if (seq !== customerSearchSeq.current) return;
+      if (error) {
+        setCustomers([]);
+        toast({
+          title: 'Customer search failed',
+          description: error.message || 'Try again.',
+          variant: 'destructive',
+        });
+      } else {
+        setCustomers(
+          ((data || []) as any[]).map((row) => ({
+            id: row.account_id,
+            name: row.name,
+            match_reason: row.match_reason ?? null,
+            policies_count: row.policies_count ?? null,
+          }))
+        );
+      }
       setSearchingCustomers(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [customerSearch, lockedCustomer]);
+  }, [customerSearch, lockedCustomer, toast]);
 
   const filteredMethods = useMemo(() => {
     if (formData.paid_to === 'company') {
@@ -244,8 +295,15 @@ export function RecordPaymentForm({
     });
   };
 
-  const formatPolicyOption = (policy: Policy) =>
-    policy.carrier ? `${policy.policy_number} - ${policy.carrier}` : policy.policy_number;
+  const formatPolicyOption = (policy: Policy) => {
+    const number = policy.policy_number || 'No policy number';
+    const base = policy.carrier_name ? `${number} - ${policy.carrier_name}` : number;
+    // A shared policy is owned by another account; name the owner so staff do
+    // not have to guess whose policy they are applying the payment to.
+    return policy.membership === 'named_insured' && policy.owner_account_name
+      ? `${base} (shared - ${policy.owner_account_name})`
+      : base;
+  };
 
   const resetForm = () => {
     setFormData({
@@ -451,7 +509,21 @@ export function RecordPaymentForm({
                             value={customer.id}
                             onSelect={() => handleSelectCustomer(customer)}
                           >
-                            {customer.name}
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate">{customer.name}</span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {[
+                                  customer.match_reason && customer.match_reason !== 'name'
+                                    ? customer.match_reason
+                                    : null,
+                                  customer.policies_count === 1
+                                    ? '1 policy'
+                                    : `${customer.policies_count ?? 0} policies`,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </span>
+                            </div>
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -498,7 +570,7 @@ export function RecordPaymentForm({
               ))}
               {policies.length === 0 && !loadingPolicies && (
                 <SelectItem value="none" disabled>
-                  No policies found
+                  {policiesError ? 'Could not load policies' : 'No policies found'}
                 </SelectItem>
               )}
             </SelectContent>
