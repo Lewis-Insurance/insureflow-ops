@@ -6,6 +6,7 @@ import {
   buildAoMovedPrefill,
   buildAoMovedUpdates,
   policyTermToAoTerm,
+  validateAoMovedStatusOnly,
 } from '@/components/renewals/aoMovedPolicy';
 import { initialPolicyFormData, type PolicyFormData } from '@/components/customers/PolicyFormFields';
 
@@ -94,5 +95,34 @@ describe('buildAoMovedUpdates', () => {
     const updates = buildAoMovedUpdates(form(), 'acct-1');
     expect(updates.follow_up_date).toBeNull();
     expect(updates.follow_up_reason).toBeNull();
+  });
+
+  it('writes the same renewal fields whether or not a policy row was created', () => {
+    // The status-only path reuses this builder, so a moved renewal recorded
+    // without an insert must be indistinguishable from one recorded with it.
+    const withPolicy = buildAoMovedUpdates(form(), 'acct-1');
+    const statusOnly = buildAoMovedUpdates(form({ policy_number: '' }), 'acct-1');
+    expect(statusOnly).toEqual(withPolicy);
+  });
+});
+
+describe('validateAoMovedStatusOnly', () => {
+  const form = (overrides: Partial<PolicyFormData> = {}): PolicyFormData => ({
+    ...initialPolicyFormData,
+    carrier: 'Progressive',
+    ...overrides,
+  });
+
+  it('lets the status-only write through once the new carrier is filled in', () => {
+    expect(validateAoMovedStatusOnly(form())).toBeNull();
+  });
+
+  it('blocks it without a carrier, since moved_carrier is the point of the write', () => {
+    expect(validateAoMovedStatusOnly(form({ carrier: '' }))).toMatch(/carrier/i);
+    expect(validateAoMovedStatusOnly(form({ carrier: '   ' }))).toMatch(/carrier/i);
+  });
+
+  it('does not require a policy number or premium, because no policy is created', () => {
+    expect(validateAoMovedStatusOnly(form({ policy_number: '', premium: '' }))).toBeNull();
   });
 });

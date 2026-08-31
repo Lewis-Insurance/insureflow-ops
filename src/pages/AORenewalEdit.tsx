@@ -27,8 +27,8 @@ import { useAORenewal, useUpdateAORenewal, useUpdateAORenewalStatus, useSetAORen
 import { useProfiles } from '@/hooks/useProfiles';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
-import { AddPolicyModal, type AddPolicyAfterSaveContext } from '@/components/customers/AddPolicyModal';
-import { buildAoMovedPrefill, buildAoMovedUpdates } from '@/components/renewals/aoMovedPolicy';
+import { AddPolicyModal, type AddPolicySecondaryActionContext } from '@/components/customers/AddPolicyModal';
+import { buildAoMovedPrefill, buildAoMovedUpdates, validateAoMovedStatusOnly } from '@/components/renewals/aoMovedPolicy';
 import { TerminalStatusModal, type TerminalStatusData, type TerminalStatusType } from '@/components/renewals/TerminalStatusModal';
 import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
@@ -290,11 +290,13 @@ export default function AORenewalEdit() {
   };
 
   /**
-   * Runs only after the replacement policy row exists. Throwing leaves the Add
-   * New Policy popup open with a retry, so the renewal is never left un-moved
-   * behind a closed modal.
+   * The ao_renewals write-back for a moved renewal. On the Add Policy path it
+   * runs only after the policy row exists; on the "Only change status" path it
+   * is the whole write, because the replacement policy is already on the
+   * customer's file. Throwing leaves the popup open with a retry, so the
+   * renewal is never left un-moved behind a closed modal.
    */
-  const handleMovedAfterSave = async ({ accountId, form }: AddPolicyAfterSaveContext) => {
+  const handleMovedWriteBack = async ({ accountId, form }: AddPolicySecondaryActionContext) => {
     // Never resolve without writing: a silent success would close the popup on
     // a renewal that is still sitting in its old status.
     if (!id) throw new Error('No renewal id');
@@ -1300,11 +1302,16 @@ export default function AORenewalEdit() {
             enableCustomerSearch
             customerSearchQuery={formData.customer_name}
             title="Add New Policy"
-            description={`Record the policy ${formData.customer_name || 'this customer'} moved to. Saving also marks this renewal Moved.`}
+            description={`Record the policy ${formData.customer_name || 'this customer'} moved to. Saving also marks this renewal Moved. If that policy is already on the customer, use Only change status.`}
             submitLabel="Add Policy and Mark Moved"
             initialValues={buildAoMovedPrefill(renewal)}
-            onAfterSave={handleMovedAfterSave}
+            onAfterSave={handleMovedWriteBack}
             afterSaveErrorMessage="The policy was saved but the renewal was not marked Moved."
+            secondaryActionLabel="Only change status"
+            onSecondaryAction={handleMovedWriteBack}
+            validateSecondaryAction={validateAoMovedStatusOnly}
+            secondaryActionSuccessMessage="Renewal marked Moved. No new policy was added."
+            secondaryActionErrorMessage="The renewal was not marked Moved. Please try again."
           />
         )}
         {/* Edits the already-captured move details. It never writes a policy. */}
