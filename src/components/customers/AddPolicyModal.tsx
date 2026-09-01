@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DuplicatePolicyDialog, type ExistingPolicyInfo } from './DuplicatePolicyDialog';
+import { PolicyAlreadyOnFileDialog } from './PolicyAlreadyOnFileDialog';
 import { CustomerSearchSelect, type CustomerSearchResult } from './CustomerSearchSelect';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,12 +26,16 @@ import { generateTasks } from '@/lib/taskAutomation';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
 
-/** Context handed to `onAfterSave` once the policy row exists. */
-export interface AddPolicyAfterSaveContext {
+/** Context handed to a caller-owned write that does not create a policy row. */
+export interface AddPolicySecondaryActionContext {
   accountId: string;
-  policyId: string;
-  /** The form values as they were when Add Policy was pressed. */
+  /** The form values as they were when the button was pressed. */
   form: PolicyFormData;
+}
+
+/** Context handed to `onAfterSave` once the policy row exists. */
+export interface AddPolicyAfterSaveContext extends AddPolicySecondaryActionContext {
+  policyId: string;
 }
 
 interface AddPolicyModalProps {
@@ -75,6 +80,27 @@ interface AddPolicyModalProps {
   onAfterSave?: (context: AddPolicyAfterSaveContext) => Promise<void>;
   /** Banner text shown when `onAfterSave` fails. */
   afterSaveErrorMessage?: string;
+  /**
+   * Optional second button next to the primary save, for the case where the
+   * policy is already on the customer's file and only the caller's own record
+   * needs updating. AO Moved uses it for "Only change status": it runs
+   * `onSecondaryAction` and never touches the policies table.
+   *
+   * Providing it also changes what a duplicate policy number does: instead of a
+   * dead-end toast, the CSR is told the policy is already on file and offered
+   * this same status-only write.
+   */
+  secondaryActionLabel?: string;
+  onSecondaryAction?: (context: AddPolicySecondaryActionContext) => Promise<void>;
+  /**
+   * Soft validation for the secondary action, run after the customer check.
+   * Return an error message to block it, or null to let it through.
+   */
+  validateSecondaryAction?: (form: PolicyFormData) => string | null;
+  /** Toast text when `onSecondaryAction` fails. */
+  secondaryActionErrorMessage?: string;
+  /** Toast text when `onSecondaryAction` succeeds. */
+  secondaryActionSuccessMessage?: string;
 }
 
 export function AddPolicyModal({
@@ -92,6 +118,11 @@ export function AddPolicyModal({
   initialValues,
   onAfterSave,
   afterSaveErrorMessage = 'The policy was saved but the follow-up update did not go through.',
+  secondaryActionLabel,
+  onSecondaryAction,
+  validateSecondaryAction,
+  secondaryActionErrorMessage = 'The update did not go through. Please try again.',
+  secondaryActionSuccessMessage = 'Status updated',
 }: AddPolicyModalProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<PolicyFormData>(initialPolicyFormData);
@@ -118,6 +149,12 @@ export function AddPolicyModal({
   // values as they were at the moment of failure so Retry replays exactly that
   // write, never whatever the form happens to show later.
   const [failedAfterSave, setFailedAfterSave] = useState<AddPolicyAfterSaveContext | null>(null);
+  // Set when the insert was rejected because the policy number already exists
+  // and the caller offers a status-only alternative. Holds the snapshot from
+  // that attempt so the status-only write uses the values the CSR submitted.
+  const [alreadyOnFile, setAlreadyOnFile] = useState<
+    (AddPolicySecondaryActionContext & { policyNumber: string }) | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prefillAppliedRef = useRef(false);
   const { toast } = useToast();
@@ -142,6 +179,7 @@ export function AddPolicyModal({
     setCustomerError('');
     setCustomerSearchOpen(false);
     setFailedAfterSave(null);
+    setAlreadyOnFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
@@ -444,6 +482,17 @@ export function AddPolicyModal({
           await openDuplicateDialog(policyData.policy_number);
           return;
         }
+        // Surfaces with a status-only alternative (AO Moved) get a second popup
+        // instead of a dead-end error: the policy is already there, so the only
+        // thing left to do is the caller's own write. Nothing was inserted.
+        if (isDuplicatePolicyNumber && onSecondaryAction && secondaryActionLabel) {
+          setAlreadyOnFile({
+            accountId: savedAccountId,
+            form: savedForm,
+            policyNumber: policyData.policy_number,
+          });
+          return;
+        }
         toast({
           title: 'Error',
           description: error.message,
@@ -566,6 +615,60 @@ export function AddPolicyModal({
   }
 
   /**
+   * The caller's status-only write. No policy row is created, which is the
+   * whole point: the replacement policy is already on the customer's file.
+   * Takes the snapshot to write explicitly, so the "already on file" dialog
+   * commits the values that were submitted rather than a later edit.
+   */
+  async function runSecondaryAction(context: AddPolicySecondaryActionContext) {
+    if (!onSecondaryAction) return;
+
+    setLoading(true);
+    try {
+      await onSecondaryAction(context);
+      toast({ title: 'Success', description: secondaryActionSuccessMessage });
+      resetForm();
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (error) {
+      toast({
+        title: 'Not saved',
+        description: secondaryActionErrorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * The secondary button on the form. Validates only what the caller's write
+   * needs (never the full policy schema, since no policy is being created).
+   */
+  function handleSecondaryAction() {
+    if (!onSecondaryAction) return;
+
+    if (enableCustomerSearch && !selectedCustomer) {
+      setCustomerError('Choose the customer this policy belongs to.');
+      toast({
+        title: 'Customer required',
+        description: 'Choose the customer this policy belongs to.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setCustomerError('');
+
+    const message = validateSecondaryAction?.(formData);
+    if (message) {
+      toast({ title: 'Missing information', description: message, variant: 'destructive' });
+      return;
+    }
+
+    void runSecondaryAction({ accountId: resolvedAccountId, form: { ...formData } });
+  }
+
+  /**
    * Closing after a failed follow-up still leaves a real policy behind, so the
    * caller has to refresh even though its own write did not land.
    */
@@ -575,6 +678,7 @@ export function AddPolicyModal({
     // seeded surfaces (and a half-completed save) start over.
     if (isSeededSurface || policySaved) resetForm();
     setFailedAfterSave(null);
+    setAlreadyOnFile(null);
     setCustomerError('');
     setCustomerSearchOpen(false);
     onOpenChange(false);
@@ -749,9 +853,17 @@ export function AddPolicyModal({
                 {loading ? 'Retrying...' : 'Retry'}
               </Button>
             ) : (
-              <Button onClick={handleSave} disabled={loading || parsing} className="bg-green-600 hover:bg-green-700">
-                {loading ? 'Adding...' : submitLabel}
-              </Button>
+              <>
+                {/* Outline, not a second fill: one primary fill per surface. */}
+                {onSecondaryAction && secondaryActionLabel && (
+                  <Button variant="outline" onClick={handleSecondaryAction} disabled={loading || parsing}>
+                    {secondaryActionLabel}
+                  </Button>
+                )}
+                <Button onClick={handleSave} disabled={loading || parsing} className="bg-green-600 hover:bg-green-700">
+                  {loading ? 'Adding...' : submitLabel}
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -781,6 +893,24 @@ export function AddPolicyModal({
         navigate(`/policies/${policyId}`);
       }}
     />
+
+    {/* Duplicate policy number on a surface that offers a status-only write.
+        Cancel returns to the form with nothing saved; the confirm runs the
+        caller's write without inserting a second policy. */}
+    {secondaryActionLabel && (
+      <PolicyAlreadyOnFileDialog
+        open={!!alreadyOnFile}
+        onOpenChange={(next) => { if (!next) setAlreadyOnFile(null); }}
+        policyNumber={alreadyOnFile?.policyNumber ?? ''}
+        confirmLabel={secondaryActionLabel}
+        loading={loading}
+        onConfirm={() => {
+          if (!alreadyOnFile) return;
+          const { policyNumber: _ignored, ...context } = alreadyOnFile;
+          void runSecondaryAction(context);
+        }}
+      />
+    )}
     </>
   );
 }

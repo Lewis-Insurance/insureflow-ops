@@ -59,3 +59,17 @@ export function buildAoMovedUpdates(form: PolicyFormData, accountId: string) {
     follow_up_reason: null,
   };
 }
+
+/**
+ * Guard for the status-only path ("Only change status"), used when the
+ * replacement policy is already on the CRM customer so there is nothing to
+ * insert. It checks exactly what `buildAoMovedUpdates` has to write: the
+ * carrier the policy moved to. The account link is enforced by the modal's own
+ * customer picker. Returns an error message, or null when the write can run.
+ */
+export function validateAoMovedStatusOnly(form: PolicyFormData): string | null {
+  if (!form.carrier?.trim()) {
+    return 'Enter the carrier this policy moved to before changing the status.';
+  }
+  return null;
+}

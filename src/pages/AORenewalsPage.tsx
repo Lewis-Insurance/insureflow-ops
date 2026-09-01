@@ -18,8 +18,8 @@ import {
   Upload,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { AddPolicyModal, type AddPolicyAfterSaveContext } from "@/components/customers/AddPolicyModal";
-import { buildAoMovedPrefill, buildAoMovedUpdates } from "@/components/renewals/aoMovedPolicy";
+import { AddPolicyModal, type AddPolicySecondaryActionContext } from "@/components/customers/AddPolicyModal";
+import { buildAoMovedPrefill, buildAoMovedUpdates, validateAoMovedStatusOnly } from "@/components/renewals/aoMovedPolicy";
 import { TerminalStatusModal, type TerminalStatusData, type TerminalStatusType } from "@/components/renewals/TerminalStatusModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -364,14 +364,16 @@ export default function AORenewalsPage() {
   };
 
   /**
-   * Runs only after the replacement policy row exists. Throwing here keeps the
-   * Add New Policy popup open with a retry, so a failed write never leaves the
-   * renewal silently un-moved.
+   * The ao_renewals write-back for a moved renewal. On the Add Policy path it
+   * runs only after the policy row exists; on the "Only change status" path it
+   * is the whole write, because the replacement policy is already on the
+   * customer's file. Throwing keeps the popup open with a retry, so a failed
+   * write never leaves the renewal silently un-moved.
    */
-  const handleMovedAfterSave = async ({
+  const handleMovedWriteBack = async ({
     accountId,
     form,
-  }: AddPolicyAfterSaveContext) => {
+  }: AddPolicySecondaryActionContext) => {
     // Never resolve without writing: a silent success would close the popup on
     // a renewal that is still sitting in its old status.
     if (!movedModalRenewal) throw new Error('No renewal selected');
@@ -727,11 +729,16 @@ export default function AORenewalsPage() {
           enableCustomerSearch
           customerSearchQuery={movedModalRenewal.customer_name}
           title="Add New Policy"
-          description={`Record the policy ${movedModalRenewal.customer_name} moved to. Saving also marks this renewal Moved.`}
+          description={`Record the policy ${movedModalRenewal.customer_name} moved to. Saving also marks this renewal Moved. If that policy is already on the customer, use Only change status.`}
           submitLabel="Add Policy and Mark Moved"
           initialValues={buildAoMovedPrefill(movedModalRenewal)}
-          onAfterSave={handleMovedAfterSave}
+          onAfterSave={handleMovedWriteBack}
           afterSaveErrorMessage="The policy was saved but the renewal was not marked Moved."
+          secondaryActionLabel="Only change status"
+          onSecondaryAction={handleMovedWriteBack}
+          validateSecondaryAction={validateAoMovedStatusOnly}
+          secondaryActionSuccessMessage="Renewal marked Moved. No new policy was added."
+          secondaryActionErrorMessage="The renewal was not marked Moved. Please try again."
           onSuccess={() => setMovedModalRenewal(null)}
         />
       )}
