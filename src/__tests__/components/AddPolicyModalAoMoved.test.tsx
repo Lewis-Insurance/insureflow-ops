@@ -20,6 +20,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mocks = vi.hoisted(() => ({
   /** Rows the policies table actually accepted. */
@@ -29,6 +30,16 @@ const mocks = vi.hoisted(() => ({
   /** Set to make the next policies insert fail (duplicate policy number). */
   insertError: null as { code?: string; message: string } | null,
   toast: vi.fn(),
+  /**
+   * The carrier directory the picker reads. 'Progressive' is an exact name, so
+   * typing it links carrier_id without any extra clicks; that link is what lets
+   * a certificate resolve the insurer NAIC from `carriers`.
+   */
+  carriers: [{ id: 'car-1', name: 'Progressive', naic: '24260' }] as Array<{
+    id: string;
+    name: string;
+    naic: string | null;
+  }>,
 }));
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -37,6 +48,13 @@ vi.mock('@/integrations/supabase/client', () => ({
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null }),
     },
     from: vi.fn((table: string) => ({
+      select: () => ({
+        order: () =>
+          Promise.resolve({
+            data: table === 'carriers' ? mocks.carriers : [],
+            error: null,
+          }),
+      }),
       insert: (rows: Record<string, unknown>[]) => ({
         select: () => ({
           single: () => {
@@ -104,7 +122,14 @@ function renderModal(props: Partial<React.ComponentProps<typeof AddPolicyModal>>
     .fn<(context: AddPolicySecondaryActionContext) => Promise<void>>()
     .mockResolvedValue(undefined);
 
+  // The carrier picker reads and writes the carrier directory through react
+  // query, so the modal needs a client. Retries off so a mock miss fails fast.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
   render(
+    <QueryClientProvider client={queryClient}>
     <MemoryRouter>
       <AddPolicyModal
         open
@@ -120,7 +145,8 @@ function renderModal(props: Partial<React.ComponentProps<typeof AddPolicyModal>>
         validateSecondaryAction={validateAoMovedStatusOnly}
         {...props}
       />
-    </MemoryRouter>,
+    </MemoryRouter>
+    </QueryClientProvider>,
   );
 
   return { onOpenChange, onAfterSave, onSecondaryAction };
@@ -174,6 +200,8 @@ describe('AddPolicyModal, AO Moved path', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'pick customer' }));
     fillRequiredPolicyFields({ premium: '1200' });
+    // Wait for the carrier picker to link the typed name to its directory row.
+    await screen.findByText(/from the carrier directory/i);
     fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
 
     await waitFor(() => expect(onAfterSave).toHaveBeenCalledTimes(1));
@@ -184,6 +212,14 @@ describe('AddPolicyModal, AO Moved path', () => {
       policy_number: 'POL-9001',
       carrier: 'Progressive',
       line_of_business: 'Personal Auto',
+      // The carrier name matches the directory exactly, so the policy links to
+      // that carriers row. Without carrier_id a certificate has no carrier
+      // record to take a NAIC from, and the ACORD 25 NAIC box prints blank.
+      carrier_id: 'car-1',
+      // NAIC is never snapshotted onto the policy: policies.carrier_naic
+      // outranks carriers.naic forever, so a copy taken here would ignore a
+      // later correction on the Carriers page.
+      carrier_naic: null,
     });
 
     const context = onAfterSave.mock.calls[0][0];

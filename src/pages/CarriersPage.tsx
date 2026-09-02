@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateCarrierDependents, normalizeNaic } from '@/hooks/useCarrierDirectory';
 import { formatPhoneForDisplay } from '@/lib/format';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +51,13 @@ interface CarrierFormData {
   zip_code: string;
 }
 
+/**
+ * What actually gets written to `carriers`. The form holds strings for control
+ * convenience; the row stores null for "not on file" so a blank never reads as
+ * a value (see the NAIC resolution fix, 20260902120000).
+ */
+type CarrierWritePayload = Record<string, string | null>;
+
 const initialFormData: CarrierFormData = {
   name: '',
   naic: '',
@@ -69,12 +77,16 @@ const initialFormData: CarrierFormData = {
 export default function CarriersPage() {
   const [searchParams] = useSearchParams();
   const highlightCarrierId = searchParams.get('carrier');
+  // Master COI links here by insurer NAME when a certificate has no NAIC to
+  // print, because the carrier that owns the NAIC is not always the one the
+  // policy is linked to.
+  const initialQuery = searchParams.get('q') ?? '';
   
   const [editingCarrier, setEditingCarrier] = useState<Carrier | null>(null);
   const [formData, setFormData] = useState<CarrierFormData>(initialFormData);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deletingCarrier, setDeletingCarrier] = useState<Carrier | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const queryClient = useQueryClient();
 
   const { data: carriers, isLoading } = useQuery({
@@ -102,14 +114,18 @@ export default function CarriersPage() {
   }, [highlightCarrierId, carriers]);
 
   const createCarrierMutation = useMutation({
-    mutationFn: async (data: CarrierFormData) => {
+    mutationFn: async (data: CarrierWritePayload) => {
       const { error } = await supabase
         .from('carriers')
         .insert([data]);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['carriers'] });
+      // A carrier write moves Master COI and the certificate preview too: they
+      // resolve insurer NAIC live from these rows, and the master-coi query has
+      // a five minute staleTime. Without this, a NAIC added here is invisible to
+      // Generate COI for minutes, which reads as "the NAIC is not generating".
+      invalidateCarrierDependents(queryClient);
       setIsDialogOpen(false);
       setFormData(initialFormData);
       toast.success('Carrier created successfully');
@@ -120,7 +136,7 @@ export default function CarriersPage() {
   });
 
   const updateCarrierMutation = useMutation({
-    mutationFn: async (data: { id: string; updates: Partial<CarrierFormData> }) => {
+    mutationFn: async (data: { id: string; updates: CarrierWritePayload }) => {
       const { error } = await supabase
         .from('carriers')
         .update(data.updates)
@@ -128,7 +144,7 @@ export default function CarriersPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['carriers'] });
+      invalidateCarrierDependents(queryClient);
       setIsDialogOpen(false);
       setEditingCarrier(null);
       setFormData(initialFormData);
@@ -168,7 +184,7 @@ export default function CarriersPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['carriers'] });
+      invalidateCarrierDependents(queryClient);
       setDeletingCarrier(null);
       toast.success('Carrier deleted');
     },
@@ -206,8 +222,19 @@ export default function CarriersPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Trim the name so stray leading/trailing whitespace never breaks sorting.
-    const payload = { ...formData, name: formData.name.trim() };
+    // Trim every field, and store a blank as null rather than ''. An empty
+    // string NAIC used to be indistinguishable from a real one downstream: it
+    // short-circuited the NAIC lookup in get_master_coi and printed an empty
+    // NAIC box on the ACORD 25 insurer table.
+    const payload: CarrierWritePayload = Object.fromEntries(
+      Object.entries(formData).map(([key, raw]) => [key, (raw ?? '').trim() || null]),
+    );
+    payload.name = formData.name.trim();
+    payload.naic = normalizeNaic(formData.naic);
+    if (!payload.name) {
+      toast.error('Enter a carrier name.');
+      return;
+    }
     if (editingCarrier) {
       updateCarrierMutation.mutate({ id: editingCarrier.id, updates: payload });
     } else {

@@ -17,6 +17,8 @@ import {
   buildPolicyInsert,
   type PolicyFormData,
 } from './PolicyFormFields';
+import type { CarrierResolution } from '@/components/add-policy/CarrierCombobox';
+import { findCarrierByName, useCarrierDirectory } from '@/hooks/useCarrierDirectory';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeForILike } from '@/lib/sanitize';
 import { mapLineOfBusiness } from '@/lib/policyParserMap';
@@ -126,6 +128,10 @@ export function AddPolicyModal({
 }: AddPolicyModalProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<PolicyFormData>(initialPolicyFormData);
+  // The carrier directory row the picker resolved. Written to policies.carrier_id
+  // so Master COI can resolve the insurer NAIC from `carriers` (one carrier store).
+  const [carrierResolution, setCarrierResolution] = useState<CarrierResolution | null>(null);
+  const { data: carrierDirectory = [] } = useCarrierDirectory();
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [parseStatus, setParseStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -170,6 +176,7 @@ export function AddPolicyModal({
 
   const resetForm = useCallback(() => {
     setFormData(initialPolicyFormData);
+    setCarrierResolution(null);
     setUploadedFile(null);
     setUploadedFilePath(null);
     setParseStatus('idle');
@@ -450,6 +457,12 @@ export function AddPolicyModal({
     // Snapshot the values this save is committing. Everything below reads the
     // snapshot, so a later edit to the live form cannot change what a retry writes.
     const savedForm: PolicyFormData = { ...formData };
+    // Backstop the picker: if the form was submitted before the name auto-linked,
+    // an exact directory name still links carrier_id. A name-only policy is what
+    // leaves a certificate with no carrier record to read a NAIC from.
+    const exactByName = findCarrierByName(carrierDirectory, formData.carrier);
+    const savedCarrier =
+      carrierResolution ?? (exactByName ? { id: exactByName.id, naic: exactByName.naic } : null);
     const savedAccountId = resolvedAccountId;
 
     setLoading(true);
@@ -464,7 +477,7 @@ export function AddPolicyModal({
         return;
       }
 
-      const policyData = buildPolicyInsert(savedForm, savedAccountId, user.id);
+      const policyData = buildPolicyInsert(savedForm, savedAccountId, user.id, savedCarrier);
 
       const { data: newPolicy, error } = await supabase
         .from('policies')
@@ -822,6 +835,8 @@ export function AddPolicyModal({
           <PolicyFormFields
             value={formData}
             onChange={handleInputChange}
+            carrierResolution={carrierResolution}
+            onCarrierResolutionChange={setCarrierResolution}
             errors={errors}
             needsConfirmation={needsConfirmation}
             carriers={carriers}

@@ -427,3 +427,62 @@ describe('fromMasterCoi write-in coverages: native slot vs DOO spill', () => {
     expect(build.fieldValues[ACORD25_FIELD_MAP.auto_writeInAmount.pdfField]).toBe('');
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Blank NAIC (regression, 2026-09-02)
+//
+// carriers.naic was stored as '' for "no NAIC on file", and that empty string
+// travelled all the way onto the certificate: the adapter turned it into the
+// string '' and the ACORD 25 printed an empty NAIC # box that looks exactly like
+// a filled one that failed to render. Blank must reach the builder as null so
+// the NAIC_MISSING warning fires.
+// ---------------------------------------------------------------------------
+
+describe('fromMasterCoi blank NAIC handling', () => {
+  function buildWithNaic(naic: string | null) {
+    const mc = masterCoi();
+    mc.insurers = [
+      {
+        letter: 'A',
+        name: cell('Security National Insurance Company'),
+        naic: cell(naic),
+        carrier_id: null,
+        resolution: 'exact',
+        lines: ['gl', 'auto'],
+        policy_ids: ['pol-gl', 'pol-auto'],
+      },
+    ];
+    const input = toAcord25BuildInput({
+      masterCoi: mc,
+      selectedLines: ['gl'],
+      holder: { name: 'City of Peoria', addressLines: ['419 Fulton St'] },
+      holderResolution: [],
+      printIntents: {},
+      descriptionOfOperations: '',
+      remarks: '',
+      certificateDate: '2026-09-02',
+      authorizedRepName: 'Dana Producer',
+    });
+    return { input, build: buildAcord25FieldValues(input) };
+  }
+
+  it('maps an empty-string NAIC to null instead of onto the form', () => {
+    const { input, build } = buildWithNaic('');
+    expect(input.letterAssignments[0].naic).toBeNull();
+    expect(build.fieldValues[ACORD25_FIELD_MAP.insurerNaic_A.pdfField]).toBe('');
+    expect(build.issues.some((w) => w.code === 'NAIC_MISSING')).toBe(true);
+  });
+
+  it('maps a whitespace-only NAIC to null', () => {
+    const { input } = buildWithNaic('   ');
+    expect(input.letterAssignments[0].naic).toBeNull();
+  });
+
+  it('keeps a real NAIC and trims it onto the form', () => {
+    const { input, build } = buildWithNaic(' 19879 ');
+    expect(input.letterAssignments[0].naic).toBe('19879');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.insurerNaic_A.pdfField]).toBe('19879');
+    expect(build.issues.some((w) => w.code === 'NAIC_MISSING')).toBe(false);
+  });
+});

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Shield, Phone, Mail, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateCarrierDependents, normalizeNaic } from '@/hooks/useCarrierDirectory';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 
@@ -78,7 +79,7 @@ export function CarrierManagement() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['carriers'] });
+      invalidateCarrierDependents(queryClient);
       toast({ title: "Carrier created successfully" });
       setIsDialogOpen(false);
       resetForm();
@@ -98,7 +99,7 @@ export function CarrierManagement() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['carriers'] });
+      invalidateCarrierDependents(queryClient);
       toast({ title: "Carrier updated successfully" });
       setIsDialogOpen(false);
       setEditingCarrier(null);
@@ -119,7 +120,7 @@ export function CarrierManagement() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['carriers'] });
+      invalidateCarrierDependents(queryClient);
       toast({ title: "Carrier deleted successfully" });
     },
     onError: (error) => {
@@ -176,7 +177,8 @@ export function CarrierManagement() {
     
     const submitData = {
       ...formData,
-      naic: formData.naic || null,
+      // Blank is not a NAIC: store null so downstream lookups can fall through.
+      naic: normalizeNaic(formData.naic),
       agency_code: formData.agency_code || null,
       main_phone: formData.main_phone || null,
       claims_phone: formData.claims_phone || null,

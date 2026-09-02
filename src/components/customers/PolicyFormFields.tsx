@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EnumCombobox } from '@/components/ui/enum-combobox';
 import { calcExpirationDate, parsePolicyTerm } from '@/lib/policyDates';
 import { mapLineOfBusiness, mapCarrier } from '@/lib/policyParserMap';
+import { CarrierCombobox, type CarrierResolution } from '@/components/add-policy/CarrierCombobox';
 import { format } from 'date-fns';
 import { z } from 'zod';
 
@@ -178,6 +179,17 @@ export function buildPolicyInsert(
   data: PolicyFormData,
   accountId: string,
   userId: string | null,
+  /**
+   * The carrier directory row the picker resolved, when there is one. Writing
+   * carrier_id is what lets Master COI resolve the insurer NAIC live from
+   * `carriers`; a name-only policy can never fill a NAIC on an ACORD 25.
+   *
+   * carrier_naic is deliberately written as null rather than snapshotted from
+   * the directory. On the policy it is the manual override and outranks
+   * carriers.naic forever, so a copy taken at intake would freeze whatever the
+   * directory happened to hold that day and quietly ignore later corrections.
+   */
+  carrier?: CarrierResolution | null,
 ) {
   // Parse premium - remove commas and convert to number, default to 0
   const premiumValue = data.premium
@@ -189,6 +201,8 @@ export function buildPolicyInsert(
     insured_user_id: userId,
     policy_number: data.policy_number.trim(),
     carrier: data.carrier.trim(),
+    carrier_id: carrier?.id ?? null,
+    carrier_naic: null,
     line_of_business: data.line_of_business.trim(),
     premium: isNaN(premiumValue) ? 0 : premiumValue,
     effective_date: data.effective_date,
@@ -205,9 +219,16 @@ interface PolicyFormFieldsProps {
   onChange: (field: string, value: string) => void;
   errors?: Record<string, string>;
   needsConfirmation?: Record<string, boolean>;
+  /**
+   * Retained for callers that still feed the extraction matcher. The carrier
+   * field itself reads the directory through CarrierCombobox.
+   */
   carriers: LookupOption[];
   linesOfBusiness: LookupOption[];
   lobLoading?: boolean;
+  /** The carrier directory row the picker resolved, or null for text only. */
+  carrierResolution?: CarrierResolution | null;
+  onCarrierResolutionChange?: (resolution: CarrierResolution | null) => void;
 }
 
 /**
@@ -223,6 +244,8 @@ export function PolicyFormFields({
   carriers,
   linesOfBusiness,
   lobLoading = false,
+  carrierResolution = null,
+  onCarrierResolutionChange,
 }: PolicyFormFieldsProps) {
   return (
     <>
@@ -242,19 +265,19 @@ export function PolicyFormFields({
         </div>
         <div>
           <Label htmlFor="carrier">Carrier *</Label>
-          <Input
+          {/* One carrier store: this picker reads and writes public.carriers,
+              the same rows the Carriers page owns, and links carrier_id so the
+              certificate NAIC follows the directory. */}
+          <CarrierCombobox
             id="carrier"
-            list="carrier-list"
             value={value.carrier}
-            onChange={(e) => onChange('carrier', e.target.value)}
-            placeholder="Type or select carrier"
-            className={errors.carrier ? 'border-destructive' : ''}
+            resolution={carrierResolution}
+            error={!!errors.carrier}
+            onChange={(name, resolution) => {
+              onChange('carrier', name);
+              onCarrierResolutionChange?.(resolution);
+            }}
           />
-          <datalist id="carrier-list">
-            {carriers.map(carrier => (
-              <option key={carrier.id} value={carrier.name} />
-            ))}
-          </datalist>
           {errors.carrier && (
             <p className="text-sm text-destructive mt-1">{errors.carrier}</p>
           )}

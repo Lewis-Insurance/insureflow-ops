@@ -420,7 +420,13 @@ export type COIReadinessWarningCode =
   | 'review_stale'
   | 'unclassified_policies'
   | 'producer_incomplete'
-  | 'source_data_stale';
+  | 'source_data_stale'
+  // The policy's carrier_id points at a different carriers row than the insurer
+  // name the certificate prints (typically the wholesaler on the link and the
+  // issuing carrier in policies.carrier). Added 2026-09-02 with the NAIC
+  // resolution fix so a NAIC sourced from a carriers row other than the linked
+  // one is visible rather than silent.
+  | 'carrier_link_mismatch';
 
 /** A readiness blocker (02 Section 2.7). */
 export interface COIReadinessBlocker {
