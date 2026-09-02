@@ -96,6 +96,20 @@ export function CarrierCombobox({ value, resolution, onChange, error, id, autoLi
   const linkMismatch =
     !!linked && !!q && linked.name.trim().toLowerCase() !== q && !!exactMatch && exactMatch.id !== linked.id;
 
+  // Certificate NAIC source mirrors get_master_coi: when the link names a different
+  // carrier than the printed insurer, the name-matched row wins over the link.
+  const linkedMatchesPrinted = !!linked && !!q && linked.name.trim().toLowerCase() === q;
+  const certificateNaic = linkedMatchesPrinted
+    ? linked?.naic ?? exactMatch?.naic ?? resolution?.naic ?? null
+    : exactMatch?.naic ?? linked?.naic ?? resolution?.naic ?? null;
+  const naicSourceCarrier = linkedMatchesPrinted && linked?.naic
+    ? linked
+    : exactMatch?.naic
+      ? exactMatch
+      : linked?.naic
+        ? linked
+        : exactMatch ?? linked ?? null;
+
   const pick = (c: CarrierDirectoryEntry) => {
     onChange(c.name, { id: c.id, naic: c.naic });
     setOpen(false);
@@ -123,10 +137,13 @@ export function CarrierCombobox({ value, resolution, onChange, error, id, autoLi
   };
 
   const handleSaveNaic = async () => {
-    if (!resolution) return;
+    const targetId = naicSourceCarrier?.id ?? resolution?.id;
+    if (!targetId) return;
     try {
-      const saved = await setCarrierNaic.mutateAsync({ carrierId: resolution.id, naic: naicDraft });
-      onChange(value, { id: resolution.id, naic: saved });
+      const saved = await setCarrierNaic.mutateAsync({ carrierId: targetId, naic: naicDraft });
+      if (targetId === resolution?.id) {
+        onChange(value, { id: resolution.id, naic: saved });
+      }
       setShowNaicDraft(false);
       setNaicDraft('');
       toast.success(
@@ -264,17 +281,18 @@ export function CarrierCombobox({ value, resolution, onChange, error, id, autoLi
         </div>
       )}
 
-      {resolution?.naic ? (
+      {certificateNaic ? (
         <p className="mt-1 text-xs text-cc-info">
-          NAIC <span className="cc-num font-semibold">{resolution.naic}</span> from the carrier
+          NAIC <span className="cc-num font-semibold">{certificateNaic}</span> from the carrier
           directory. Certificates read it from there, so a change on the Carriers page follows
           automatically.
         </p>
-      ) : resolution ? (
+      ) : resolution || exactMatch ? (
         <div className="mt-1 space-y-1">
           <p className="text-xs text-cc-warning">
-            Linked to the carrier directory, but no NAIC is on file. Certificates will show the NAIC
-            box as missing.
+            {linkMismatch && exactMatch
+              ? `No NAIC on file for ${exactMatch.name}, the carrier this policy names. Certificates will show the NAIC box as missing.`
+              : 'Linked to the carrier directory, but no NAIC is on file. Certificates will show the NAIC box as missing.'}
           </p>
           {showNaicDraft ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -287,7 +305,7 @@ export function CarrierCombobox({ value, resolution, onChange, error, id, autoLi
               />
               <button
                 type="button"
-                disabled={setCarrierNaic.isPending}
+                disabled={setCarrierNaic.isPending || !naicSourceCarrier}
                 onClick={handleSaveNaic}
                 className="rounded-cc-sm bg-cc-accent px-3 py-1.5 text-xs font-semibold text-cc-on-accent disabled:opacity-60"
               >
@@ -304,11 +322,12 @@ export function CarrierCombobox({ value, resolution, onChange, error, id, autoLi
           ) : (
             <button
               type="button"
+              disabled={!naicSourceCarrier}
               onClick={() => {
                 setNaicDraft('');
                 setShowNaicDraft(true);
               }}
-              className="text-xs font-semibold text-cc-accent underline-offset-2 hover:underline"
+              className="text-xs font-semibold text-cc-accent underline-offset-2 hover:underline disabled:opacity-60"
             >
               Add NAIC to the carrier directory
             </button>

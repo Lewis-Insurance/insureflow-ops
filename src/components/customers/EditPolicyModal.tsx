@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -104,6 +104,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
   // never silently relinked by a name match.
   const [carrierResolution, setCarrierResolution] = useState<CarrierResolution | null>(null);
   const [carrierLinkLoaded, setCarrierLinkLoaded] = useState(false);
+  const carrierUserEditedRef = useRef(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const { toast } = useToast();
@@ -140,6 +141,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
     let cancelled = false;
     setCarrierResolution(null);
     setCarrierLinkLoaded(false);
+    carrierUserEditedRef.current = false;
     if (!policy?.id) return;
     (async () => {
       const { data, error } = await supabase
@@ -151,14 +153,15 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
       if (error) return;
       const carrierId = (data?.carrier_id as string | null) ?? null;
       if (carrierId) {
-        const { data: carrierRow } = await supabase
+        const { data: carrierRow, error: carrierError } = await supabase
           .from('carriers')
           .select('id, naic')
           .eq('id', carrierId)
           .maybeSingle();
         if (cancelled) return;
-        if (carrierRow) {
-          const naic = ((carrierRow.naic as string | null) ?? '').trim();
+        if (carrierError || !carrierRow) return;
+        const naic = ((carrierRow.naic as string | null) ?? '').trim();
+        if (!carrierUserEditedRef.current) {
           setCarrierResolution({ id: carrierRow.id as string, naic: naic === '' ? null : naic });
         }
       }
@@ -390,6 +393,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
                 error={!!errors.carrier}
                 autoLink={carrierLinkLoaded}
                 onChange={(name, resolution) => {
+                  carrierUserEditedRef.current = true;
                   handleInputChange('carrier', name);
                   setCarrierResolution(resolution);
                 }}
