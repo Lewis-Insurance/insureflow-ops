@@ -336,13 +336,21 @@ function buildProperty(
 // Letter assignment mapping (verbatim from the contract insurer letter map).
 // ---------------------------------------------------------------------------
 
+function naicOrNull(v: string | number | boolean | null | undefined): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+}
+
 function toLetterAssignments(insurers: COIInsurer[]): InsurerAssignment[] {
   const out: InsurerAssignment[] = [];
   for (const ins of insurers) {
     out.push({
       letter: ins.letter as InsurerLetter,
       name: str(ins.name),
-      naic: ins.naic?.v !== null && ins.naic?.v !== undefined ? String(ins.naic.v) : null,
+      // Blank is not a NAIC. Passing '' through stamps an empty NAIC box on the
+      // ACORD 25 that looks identical to a filled one that failed to print.
+      naic: naicOrNull(ins.naic?.v),
       lines: (ins.lines ?? []).filter((l): l is Acord25LineKey =>
         l === 'gl' ||
         l === 'auto' ||

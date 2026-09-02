@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
+import { CarrierNaicHint } from '@/components/policies/CarrierNaicHint';
 import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EditPolicyModal } from '@/components/customers/EditPolicyModal';
@@ -82,7 +83,8 @@ export default function PolicyDetail() {
             ),
             carrier_info:carriers!policies_carrier_id_fkey(
               id,
-              name
+              name,
+              naic
             )
           `)
           .eq('id', policyId)
@@ -394,9 +396,16 @@ export default function PolicyDetail() {
                     <span>{policy.carrier || policy.carrier_info?.name || 'N/A'}</span>
                   )}
                 </div>
-                {policy.carrier_naic && (
-                  <p className="text-xs text-muted-foreground mt-1">NAIC: {policy.carrier_naic}</p>
-                )}
+                {/* Where the certificate NAIC comes from, said out loud. The
+                    carrier directory owns NAIC, so a policy that is not linked
+                    to it, or linked to a carrier with no NAIC on file, prints a
+                    blank NAIC box on the ACORD 25. That used to look like a bug
+                    with nothing on screen to explain it. */}
+                <CarrierNaicHint
+                  carrierText={policy.carrier}
+                  carrierInfo={policy.carrier_info}
+                  policyNaic={policy.carrier_naic}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">MGA</label>
