@@ -26,6 +26,7 @@ import { ItemPanel } from '@/components/pipeline/ItemPanel';
 import { LostDialog } from '@/components/pipeline/LostDialog';
 import { PipelineBoard } from '@/components/pipeline/PipelineBoard';
 import { PipelineFilters, type PipelineView } from '@/components/pipeline/PipelineFilters';
+import { closedThisMonth } from '@/components/pipeline/PipelineCard';
 import { PipelineTiles, tileMatches, type TileKey } from '@/components/pipeline/PipelineTiles';
 import { PipelineListView } from '@/components/pipeline/PipelineListView';
 import { useIntakeV4Enabled } from '@/hooks/useFeatureFlag';
@@ -105,7 +106,11 @@ function PipelineWorkspace() {
   const visible = useMemo(() => {
     let rows = items;
     if (tile) rows = rows.filter((item) => tileMatches(tile, item));
-    if (hideClosed) rows = rows.filter((item) => isOpenStage(item.stage));
+    // Closed work is only ever shown for the month in progress. Every surface uses
+    // the same rule, so the "N shown" count always matches what is on screen.
+    rows = rows.filter((item) =>
+      isOpenStage(item.stage) ? true : !hideClosed && closedThisMonth(item),
+    );
     return rows;
   }, [items, tile, hideClosed]);
 
@@ -332,14 +337,22 @@ function PipelineWorkspace() {
         )}
       </div>
 
+      {/* An outcome started from the panel closes the panel first, so the office
+          never ends up looking at a dialog stacked on top of a sheet. */}
       <ItemPanel
         itemId={panelItemId}
         open={panelOpen}
         onOpenChange={(next) => {
           if (!next) closePanel();
         }}
-        onBind={setBindItem}
-        onLost={setLostItem}
+        onBind={(item) => {
+          closePanel();
+          setBindItem(item);
+        }}
+        onLost={(item) => {
+          closePanel();
+          setLostItem(item);
+        }}
       />
 
       {/* Both dialogs take a real item, so they mount only when there is one. */}

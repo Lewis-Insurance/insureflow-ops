@@ -27,7 +27,7 @@ import { SectionLabel, Skeleton } from '@/components/cc';
 import type { PipelineItem } from '@/hooks/usePipeline';
 import { CLOSED_STAGES, OPEN_STAGES, stageLabel, type PipelineStage } from '@/lib/pipeline/stages';
 import { cn } from '@/lib/utils';
-import { PipelineCard, type StaffMember } from './PipelineCard';
+import { PipelineCard, closedThisMonth, type StaffMember } from './PipelineCard';
 
 interface PipelineBoardProps {
   items: PipelineItem[];
@@ -46,16 +46,6 @@ interface PipelineBoardProps {
   onStage: (item: PipelineItem, stage: PipelineStage) => void;
   onBind: (item: PipelineItem) => void;
   onLost: (item: PipelineItem) => void;
-}
-
-/** True when a closed item was closed inside the current calendar month. */
-function closedThisMonth(item: PipelineItem): boolean {
-  const stamp = item.bound_at ?? item.updated_at;
-  if (!stamp) return false;
-  const closed = new Date(stamp);
-  if (Number.isNaN(closed.getTime())) return false;
-  const now = new Date();
-  return closed.getFullYear() === now.getFullYear() && closed.getMonth() === now.getMonth();
 }
 
 function ColumnSkeleton() {

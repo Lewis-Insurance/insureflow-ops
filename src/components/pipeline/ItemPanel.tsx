@@ -106,13 +106,36 @@ export function ItemPanel({ itemId, open, onOpenChange, onBind, onLost }: ItemPa
         side="right"
         className="w-full border-cc-border-subtle bg-cc-surface p-0 sm:max-w-[520px]"
       >
-        {isLoading || !item ? (
+        {isLoading ? (
           <>
             <SheetHeader className="sr-only">
               <SheetTitle>Loading this item</SheetTitle>
               <SheetDescription>The pipeline item is still loading.</SheetDescription>
             </SheetHeader>
             <PanelSkeleton />
+          </>
+        ) : !item ? (
+          /* A stale ?item= link, or a row that has since been merged away. Say so
+             rather than leaving a skeleton spinning forever. */
+          <>
+            <SheetHeader className="border-b border-cc-border-subtle px-5 py-4 text-left">
+              <SheetTitle className="text-lg font-semibold text-cc-text-primary">
+                Not here any more
+              </SheetTitle>
+              <SheetDescription className="text-sm text-cc-text-secondary">
+                That item is not on the board. It may have been merged into another record or
+                removed.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="p-5">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+              >
+                Back to the board
+              </Button>
+            </div>
           </>
         ) : (
           <div className="flex h-full flex-col">

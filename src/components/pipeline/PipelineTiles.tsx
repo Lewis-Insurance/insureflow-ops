@@ -13,17 +13,9 @@ import { TriageTile } from '@/components/cc';
 import type { PipelineItem } from '@/hooks/usePipeline';
 import { differenceFromTodayInLocalDays } from '@/lib/date/localDate';
 import { isOpenStage } from '@/lib/pipeline/stages';
-import { bestPremiumAnnual, formatMoney } from './PipelineCard';
+import { bestPremiumAnnual, closedThisMonth, formatMoney } from './PipelineCard';
 
 export type TileKey = 'working' | 'quoted' | 'proposed' | 'follow_up_due' | 'bound_month';
-
-function inCurrentMonth(stamp: string | null | undefined): boolean {
-  if (!stamp) return false;
-  const closed = new Date(stamp);
-  if (Number.isNaN(closed.getTime())) return false;
-  const now = new Date();
-  return closed.getFullYear() === now.getFullYear() && closed.getMonth() === now.getMonth();
-}
 
 /** The one definition of what each tile selects, shared by the counts and the filter. */
 export function tileMatches(key: TileKey, item: PipelineItem): boolean {
@@ -40,7 +32,7 @@ export function tileMatches(key: TileKey, item: PipelineItem): boolean {
       return days !== null && days <= 0;
     }
     case 'bound_month':
-      return item.stage === 'bound' && inCurrentMonth(item.bound_at ?? item.updated_at);
+      return item.stage === 'bound' && closedThisMonth(item);
     default:
       return false;
   }

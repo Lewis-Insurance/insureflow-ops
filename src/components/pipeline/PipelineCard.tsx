@@ -157,6 +157,22 @@ export function isFollowUpOverdue(date: string | null | undefined): boolean {
   return days !== null && days < 0;
 }
 
+/**
+ * True when this item was closed inside the current calendar month.
+ *
+ * Closed work is only ever shown for the month in progress, on the board, in the
+ * list and in the tile. One definition keeps all three telling the same story, so
+ * the "N shown" count can never disagree with what is on screen.
+ */
+export function closedThisMonth(item: PipelineItem): boolean {
+  const stamp = item.bound_at ?? item.updated_at;
+  if (!stamp) return false;
+  const closed = new Date(stamp);
+  if (Number.isNaN(closed.getTime())) return false;
+  const now = new Date();
+  return closed.getFullYear() === now.getFullYear() && closed.getMonth() === now.getMonth();
+}
+
 // ---------------------------------------------------------------------------
 // Small shared cells
 // ---------------------------------------------------------------------------
