@@ -39,6 +39,25 @@
 --   explicit deny policy below is written out rather than left implicit so that the
 --   intent is visible in the catalogue, not inferred from an absence.
 --
+-- Why the read policy does not say "deleted_at is null"
+--   The first draft of this migration did say it, copying the current
+--   leads_select_policy. Testing on the branch proved that draft could not soft delete
+--   at all: PostgreSQL applies SELECT policies to the NEW row of an UPDATE, so setting
+--   deleted_at made the row invisible to the very policy being checked and the update
+--   was refused with "new row violates row-level security policy". Today's sixteen
+--   policy set hides that, because the wide "Staff can manage leads" ALL policy has no
+--   WITH CHECK and therefore passes anything; tighten the set and the trap springs.
+--
+--   So the read policy checks workspace membership only, and hiding soft deleted rows
+--   is the application's job. That is already the convention everywhere in this
+--   codebase: 72 hook queries filter .is('deleted_at', null), and the search_leads RPC
+--   filters too. The trade is deliberate and worth stating plainly: a staff user who
+--   writes a raw query with no filter can now see tombstoned prospects. They are staff,
+--   in their own workspace, looking at their own agency's records, and a tombstone is
+--   an errors and omissions trail rather than a secret. The alternative, keeping the
+--   filter and moving soft delete into a definer function, would have broken the
+--   existing delete button on the Leads page, which writes the tombstone directly.
+--
 -- The anonymous grant
 --   Separately from policies, the anon role holds a plain INSERT grant on the table.
 --   A grant and a policy are two different gates and both have to close.
@@ -56,7 +75,8 @@
 --   1. staff create      expect success
 --   2. staff read        expect the row
 --   3. staff update      expect success
---   4. staff soft delete expect success (update deleted_at), row disappears from reads
+--   4. staff soft delete expect success (update deleted_at); the row then disappears
+--                        from every application read, which filters deleted_at
 --   5. anonymous insert  expect refused, at the grant and at the policy
 --   6. non staff profile expect refused on read, insert and update
 --   7. portal membership expect refused on read
@@ -78,12 +98,12 @@ drop policy if exists leads_select_policy on public.leads;
 drop policy if exists leads_service_role_policy on public.leads;
 drop policy if exists leads_update_policy on public.leads;
 
--- 1 of 5. Staff read, workspace scoped, soft deleted rows hidden.
+-- 1 of 5. Staff read, workspace scoped. Deliberately does NOT filter deleted_at; see
+-- the note above. Every application read filters it.
 create policy leads_select_staff on public.leads
   as permissive for select to authenticated
   using (
-    deleted_at is null
-    and exists (
+    exists (
       select 1 from public.agency_workspace_memberships awm
       where awm.agency_workspace_id = leads.agency_workspace_id
         and awm.user_id = auth.uid()

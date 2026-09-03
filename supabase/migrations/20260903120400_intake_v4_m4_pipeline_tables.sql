@@ -332,7 +332,6 @@ as $function$
     join public.agency_workspace_memberships awm
       on awm.agency_workspace_id = pi.agency_workspace_id
     where pi.id = p_item_id
-      and pi.deleted_at is null
       and awm.user_id = auth.uid()
       and awm.status = 'active'
   );
@@ -343,12 +342,19 @@ revoke execute on function public.pipeline_item_is_visible(uuid) from anon;
 grant execute on function public.pipeline_item_is_visible(uuid) to authenticated;
 grant execute on function public.pipeline_item_is_visible(uuid) to service_role;
 
+-- Why none of these read policies say "deleted_at is null"
+--   PostgreSQL applies SELECT policies to the NEW row of an UPDATE. A read policy that
+--   hides soft deleted rows therefore makes soft deleting impossible: the update is
+--   refused with "new row violates row level security policy" the moment deleted_at is
+--   set. This was proved on the branch while testing M3b, not reasoned about. Hiding
+--   tombstones is the application's job here, exactly as it is for every other soft
+--   deleting table in this codebase.
+
 -- pipeline_items
 create policy pipeline_items_select_staff on public.pipeline_items
   as permissive for select to authenticated
   using (
-    deleted_at is null
-    and exists (select 1 from public.agency_workspace_memberships awm
+    exists (select 1 from public.agency_workspace_memberships awm
                 where awm.agency_workspace_id = pipeline_items.agency_workspace_id
                   and awm.user_id = auth.uid() and awm.status = 'active')
   );
@@ -379,7 +385,7 @@ create policy pipeline_items_service_role_all on public.pipeline_items
 -- pipeline_quotes
 create policy pipeline_quotes_select_staff on public.pipeline_quotes
   as permissive for select to authenticated
-  using (deleted_at is null and public.pipeline_item_is_visible(item_id));
+  using (public.pipeline_item_is_visible(item_id));
 create policy pipeline_quotes_insert_staff on public.pipeline_quotes
   as permissive for insert to authenticated
   with check (public.pipeline_item_is_visible(item_id));
@@ -395,7 +401,7 @@ create policy pipeline_quotes_service_role_all on public.pipeline_quotes
 -- pipeline_notes
 create policy pipeline_notes_select_staff on public.pipeline_notes
   as permissive for select to authenticated
-  using (deleted_at is null and public.pipeline_item_is_visible(item_id));
+  using (public.pipeline_item_is_visible(item_id));
 create policy pipeline_notes_insert_staff on public.pipeline_notes
   as permissive for insert to authenticated
   with check (public.pipeline_item_is_visible(item_id));

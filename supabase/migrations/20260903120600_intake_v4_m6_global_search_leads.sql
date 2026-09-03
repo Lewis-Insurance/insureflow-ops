@@ -22,6 +22,15 @@
 --   drop smaller, and it stops the palette showing a contact row that leads nowhere
 --   useful.
 --
+-- One correctness fix that comes with adding a branch
+--   The old function applied LIMIT p_limit to the whole UNION ALL with no ORDER BY.
+--   Because UNION ALL keeps branch order, customers could fill all fifty rows and
+--   push policies out entirely, and the palette then shows the top eight of whatever
+--   survived. Adding a fifth branch would have made that worse, not better. Each
+--   branch now takes its own share, greatest(p_limit / 4, 5), and the overall limit
+--   still caps the result. Every kind of record can therefore appear for any search
+--   term. This is a deliberate change beyond "add leads", flagged in the build log.
+--
 -- Everything else about the function is unchanged, including its workspace scoping,
 -- its early return when there is no signed in user, and its result shape
 -- (entity_type, id, label, subtitle, email, phone). The signature is identical, so
@@ -45,16 +54,19 @@ as $function$
 DECLARE
   v_search_pattern TEXT;
   v_user_id UUID;
+  v_branch  INTEGER;
 BEGIN
   v_user_id := auth.uid();
   IF v_user_id IS NULL OR p_search_term IS NULL OR trim(p_search_term) = '' THEN
     RETURN;
   END IF;
   v_search_pattern := '%' || trim(p_search_term) || '%';
+  -- Each branch takes its own share so no one kind of record can starve the others.
+  v_branch := greatest(coalesce(p_limit, 50) / 4, 5);
 
   RETURN QUERY
 
-  SELECT 'account'::TEXT, a.id,
+  (SELECT 'account'::TEXT, a.id,
     CASE WHEN a.goes_by IS NOT NULL AND a.goes_by <> ''
          THEN a.name || ' (' || a.goes_by || ')' ELSE COALESCE(a.name, 'Unnamed Account') END,
     CASE WHEN a.city IS NOT NULL AND a.state IS NOT NULL THEN a.city || ', ' || a.state ELSE NULL END,
@@ -67,12 +79,13 @@ BEGIN
     AND (a.name ILIKE v_search_pattern OR a.email ILIKE v_search_pattern OR a.phone ILIKE v_search_pattern
       OR a.goes_by ILIKE v_search_pattern
       OR EXISTS (SELECT 1 FROM account_aliases al WHERE al.account_id = a.id AND al.alias ILIKE v_search_pattern))
+  LIMIT v_branch)
 
   UNION ALL
 
   -- Prospects. Workspace scoping is an inner join because leads.agency_workspace_id
   -- has been NOT NULL since April, so there is no null workspace case to allow for.
-  SELECT 'lead'::TEXT, l.id,
+  (SELECT 'lead'::TEXT, l.id,
     COALESCE(
       NULLIF(trim(COALESCE(l.company_name, '')), ''),
       NULLIF(trim(COALESCE(l.first_name, '') || ' ' || COALESCE(l.last_name, '')), ''),
@@ -86,10 +99,11 @@ BEGIN
     AND (l.first_name ILIKE v_search_pattern OR l.last_name ILIKE v_search_pattern
       OR l.company_name ILIKE v_search_pattern
       OR l.email ILIKE v_search_pattern OR l.phone ILIKE v_search_pattern)
+  LIMIT v_branch)
 
   UNION ALL
 
-  SELECT 'business'::TEXT, b.id, COALESCE(b.legal_name, b.dba, 'Unnamed Business'),
+  (SELECT 'business'::TEXT, b.id, COALESCE(b.legal_name, b.dba, 'Unnamed Business'),
     b.dba, NULL, NULL
   FROM businesses b
   INNER JOIN accounts a ON a.business_id = b.id
@@ -98,10 +112,11 @@ BEGIN
   WHERE b.deleted_at IS NULL
     AND (a.agency_workspace_id IS NULL OR awm.id IS NOT NULL)
     AND (b.legal_name ILIKE v_search_pattern OR b.dba ILIKE v_search_pattern)
+  LIMIT v_branch)
 
   UNION ALL
 
-  SELECT 'policy'::TEXT, p.id,
+  (SELECT 'policy'::TEXT, p.id,
     CASE WHEN p.policy_number IS NOT NULL THEN 'Policy #' || p.policy_number ELSE COALESCE(p.named_insured, 'Unnamed Policy') END,
     COALESCE(car.name, 'Unknown Carrier') || ' - ' || COALESCE(p.line_of_business, 'Unknown Line'),
     NULL, NULL
@@ -114,6 +129,7 @@ BEGIN
     AND (a.agency_workspace_id IS NULL OR awm.id IS NOT NULL)
     AND (p.policy_number ILIKE v_search_pattern OR p.named_insured ILIKE v_search_pattern
       OR p.line_of_business ILIKE v_search_pattern OR car.name ILIKE v_search_pattern)
+  LIMIT v_branch)
 
   LIMIT p_limit;
 END;
