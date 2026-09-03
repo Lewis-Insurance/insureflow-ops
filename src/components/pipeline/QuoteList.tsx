@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { ALL_LINES, lineLabel } from '@/config/intake/lineConfig';
 import { useAddPipelineQuote, useUpdatePipelineQuote, type PipelineItem } from '@/hooks/usePipeline';
-import { todayLocalDate } from '@/lib/date/localDate';
+import { formatLocalDateDisplay, todayLocalDate } from '@/lib/date/localDate';
 import { QUOTE_STATUSES, QUOTE_STATUS_LABELS, type QuoteStatus } from '@/lib/pipeline/stages';
 import { annualizedPremium, bestQuoteForLine, formatMoney } from './PipelineCard';
 
@@ -201,7 +201,7 @@ export function QuoteList({ item }: { item: PipelineItem }) {
                   </Select>
                   {quote.quoted_date && (
                     <span className="cc-num text-xs text-cc-text-muted">
-                      Quoted {quote.quoted_date}
+                      Quoted {formatLocalDateDisplay(quote.quoted_date)}
                     </span>
                   )}
                 </div>

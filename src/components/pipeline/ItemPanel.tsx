@@ -84,8 +84,8 @@ export function ItemPanel({ itemId, open, onOpenChange, onBind, onLost }: ItemPa
   const current = item ? extractLocalDate(item.next_follow_up_date) : '';
   const quickDates = [
     { label: 'Tomorrow', iso: addDaysLocalDate(today, 1) },
-    { label: 'In 3 days', iso: addDaysLocalDate(today, 3) },
-    { label: 'In 7 days', iso: addDaysLocalDate(today, 7) },
+    { label: '+3 days', iso: addDaysLocalDate(today, 3) },
+    { label: '+7 days', iso: addDaysLocalDate(today, 7) },
   ];
 
   const setFollowUp = (iso: string) => {
