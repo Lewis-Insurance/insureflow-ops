@@ -71,7 +71,7 @@ function pad2(n: number): string {
  * parseLocalDate anchors at local noon so no date renders a day early, and the month
  * end rollover is pulled back (Aug 31 plus six months is Feb 28, not Mar 3).
  */
-export function deriveExpiration(effective: string, term: PipelineQuote['term']): string {
+function deriveExpiration(effective: string, term: PipelineQuote['term']): string {
   if (!effective) return '';
   const base = parseLocalDate(effective);
   const day = base.getDate();
@@ -587,7 +587,20 @@ export function BindDialog({ open, onOpenChange, item }: BindDialogProps) {
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-cc-border-subtle px-6 py-4">
+        <div className="flex items-center justify-end gap-3 border-t border-cc-border-subtle px-6 py-4">
+          {!result && item.quotes.length > 0 && (
+            <p className="mr-auto text-xs text-cc-text-muted">
+              {selected.length === 0
+                ? 'Pick at least one quote to bind.'
+                : blocked.length > 0
+                  ? 'Fix the carrier on the flagged quote first.'
+                  : incomplete.length > 0
+                    ? 'Every bound quote needs a policy number and an effective date.'
+                    : !partyReady
+                      ? 'Pick the customer to attach this to.'
+                      : ''}
+            </p>
+          )}
           {result ? (
             <Button
               type="button"
