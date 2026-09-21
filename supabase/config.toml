@@ -49,6 +49,13 @@ verify_jwt = true
 [functions.twilio-voice-webhook]
 verify_jwt = false
 
+# Haven's receiver authenticates with a scoped hvn_ bearer token of its own, not
+# a Supabase JWT, so the platform gate has to be off for the function to ever see
+# the request. The function rejects anything that is not a known, enabled,
+# unrevoked integration token before it touches the database.
+[functions.haven-policy-feed]
+verify_jwt = false
+
 [functions.twilio-recording-webhook]
 verify_jwt = false
 
