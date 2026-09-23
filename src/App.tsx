@@ -20,6 +20,8 @@ const AccountDetail = lazyWithRetry(() => import("./pages/AccountDetail"));
 const Leads = lazyWithRetry(() => import("./pages/Leads"));
 const LeadDetail = lazyWithRetry(() => import("./pages/LeadDetail"));
 const LeadAnalyticsDashboard = lazyWithRetry(() => import("./pages/LeadAnalyticsDashboard"));
+const NewLeadPage = lazyWithRetry(() => import("./pages/NewLeadPage"));
+const PipelinePage = lazyWithRetry(() => import("./pages/PipelinePage"));
 
 const PolicyDetail = lazyWithRetry(() => import("./pages/PolicyDetail"));
 const CommercialPipelinePage = lazyWithRetry(() => import("./pages/CommercialPipelinePage"));
@@ -205,6 +207,26 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <LeadAnalyticsDashboard />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/leads/new"
+                  element={
+                    <ProtectedRoute requireStaff>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <NewLeadPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/pipeline"
+                  element={
+                    <ProtectedRoute requireStaff>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <PipelinePage />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }

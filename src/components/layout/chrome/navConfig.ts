@@ -51,6 +51,8 @@ export const RAIL_GROUPS: NavGroupDef[] = [
     label: 'CRM',
     defaultOpen: true,
     items: [
+      // The pipeline board: new business, cross-sells, renewals and rewrites in one place.
+      { label: 'New Business', to: '/pipeline', icon: Briefcase, isNew: true },
       { label: 'Customers', to: '/customers', icon: Users },
       { label: 'Policies', to: '/policies', icon: FileText },
       { label: 'Renewals', to: '/renewals', icon: Calendar },
