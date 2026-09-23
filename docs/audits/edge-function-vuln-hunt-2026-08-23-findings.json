@@ -1,0 +1,190 @@
+{
+  "findings": [
+    {
+      "severity": "critical",
+      "location": "supabase/functions/canopy-monitoring/index.ts",
+      "title": "canopy-monitoring has no in-function auth; anon JWT can list pulls and trigger Canopy refreshes",
+      "description": "verify_jwt=true accepts the published anon JWT. The handler never calls requireAuth/verifyAuth/CRON_SECRET. It uses SUPABASE_SERVICE_ROLE_KEY and supports list/refresh/check_due/refresh_all_due, dumping canopy_pulls (account/lead ids and monitoring state) and calling the Canopy Monitoring API.",
+      "impact": "Anyone with the public anon key can enumerate Connect pulls across the project and force carrier refreshes, enabling reconnaissance and third-party API abuse.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:21:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Read VITE_SUPABASE_ANON_KEY from the frontend bundle.\n2. POST /functions/v1/canopy-monitoring with Authorization Bearer anon and {\"action\":\"list\"}.\n3. Handler selects completed pulls via service_role with no auth gate.\n4. Follow with refresh or refresh_all_due to hit Canopy.",
+      "evidence": [
+        "supabase/functions/canopy-monitoring/index.ts:26-90",
+        "supabase/functions/canopy-monitoring/index.ts:102-168",
+        "supabase/config.toml:166-167"
+      ],
+      "remediation": "Require staff JWT plus is_canopy_staff()/workspace bind, or fail-closed CRON_SECRET. Reject the anon key. Scope list/refresh to the caller's workspace.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/functions/canopy-servicing/index.ts",
+      "title": "canopy-servicing allows anon JWT to submit/list/confirm servicing actions without staff or workspace checks",
+      "description": "Auth runs only for email-delivery ID-card/declarations paths. submit for add/remove vehicle/driver, update coverages/address, list, status, confirm, and capabilities proceed with service_role and no caller identity. Gateway verify_jwt=true still accepts the public anon JWT.",
+      "impact": "Unauthenticated (anon-key) callers can queue carrier policy changes and dump servicing action history including account/lead linkage.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:21:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Obtain published anon JWT.\n2. POST /functions/v1/canopy-servicing with {\"action\":\"list\"}.\n3. POST submit with pull_id and action_type add_vehicle without email fields.\n4. Service-role inserts canopy_servicing_actions and calls Canopy; no staff check.",
+      "evidence": [
+        "supabase/functions/canopy-servicing/index.ts:72-163",
+        "supabase/functions/canopy-servicing/index.ts:230-273",
+        "supabase/functions/canopy-servicing/index.ts:500-521",
+        "supabase/config.toml:169-170"
+      ],
+      "remediation": "Require authenticated staff plus workspace membership on the pull's account for every action. Do not treat anon JWT as authorization.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/functions/execute-ai-module/index.ts",
+      "title": "execute-ai-module OCR/analyzes arbitrary document_ids via service_role with requireAuth-only",
+      "description": "After requireAuth (any JWT including portal), attacker-supplied document_ids are loaded with service_role. Missing extracted_text triggers Azure OCR; text is sent to Azure OpenAI; result is returned. No staff or workspace check.",
+      "impact": "Any authenticated user including a customer portal user can exfiltrate insurance document content via model output for any document UUID and burn Azure DI/OpenAI quota.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:21:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any user JWT.\n2. POST /functions/v1/execute-ai-module with module_slug and victim document_ids.\n3. Service-role loads and OCRs the document.\n4. Response result contains extracted victim content.",
+      "evidence": [
+        "supabase/functions/execute-ai-module/index.ts:149-164",
+        "supabase/functions/execute-ai-module/index.ts:208-234",
+        "supabase/functions/execute-ai-module/index.ts:421-429"
+      ],
+      "remediation": "Require is_staff() and is_agency_member on each document's account workspace before load/OCR. Prefer a user-scoped client so RLS applies.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/functions/ai-document-analysis/index.ts",
+      "title": "ai-document-analysis downloads attacker-chosen storage paths and document IDs with service_role",
+      "description": "Distinct from ai-document-analysis-simple. requireAuth only. Attacker-controlled documentPaths are downloaded from the documents bucket via service_role, OCR'd, and fed to the AI. context.metadata.documentId loads any documents row and downloads its storage object.",
+      "impact": "Cross-tenant document exfiltration and OCR/AI quota abuse by any authenticated principal who knows or guesses storage paths or document UUIDs.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:21:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. POST /functions/v1/ai-document-analysis with documentPaths of a victim storage object.\n3. Or pass context.metadata.documentId for a victim UUID.\n4. Service-role download + OCR; response includes extracted fields.",
+      "evidence": [
+        "supabase/functions/ai-document-analysis/index.ts:218-230",
+        "supabase/functions/ai-document-analysis/index.ts:261-278",
+        "supabase/functions/ai-document-analysis/index.ts:409-475"
+      ],
+      "remediation": "Bind every path/id to a document row the caller can access via workspace membership. Ignore caller bucket/path; resolve storage only from authorized rows.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/functions/renewal-rate-watch/index.ts",
+      "title": "renewal-rate-watch processes and emails any rate-watch workspace without membership checks",
+      "description": "Service-role client + requireAuth only. Attacker-supplied workspace_id loads workspaces and documents with no ownership check. Actions include process_documents, generate_report, generate_email, send_email, and full_pipeline.",
+      "impact": "Cross-tenant read of renewal quote bundles, overwrite of rate-watch artifacts, and outbound renewal emails on behalf of another agency.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:21:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. POST /functions/v1/renewal-rate-watch with action full_pipeline and victim workspace_id.\n3. Service-role runs extraction/comparison/report/email draft.\n4. Optional send_email queues or sends the draft.",
+      "evidence": [
+        "supabase/functions/renewal-rate-watch/index.ts:38-47",
+        "supabase/functions/renewal-rate-watch/index.ts:50-100",
+        "supabase/functions/renewal-rate-watch/index.ts:225-229",
+        "supabase/functions/renewal-rate-watch/index.ts:1273-1288"
+      ],
+      "remediation": "Require staff membership on the account/agency tied to the workspace. Gate send_email with client-send approval plus workspace bind.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/process-document-batch/index.ts",
+      "title": "process-document-batch lets any authenticated user claim and OCR any batch_id",
+      "description": "requireAuth only. Attacker-chosen batchId selects queued document_processing_queue rows via service_role, downloads storage objects, runs OCR, inserts documents rows, and updates queue status.",
+      "impact": "Cross-tenant queue drain, OCR of foreign files, document row injection under victim account_id, and AI quota abuse.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:21:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. Learn or guess a batch_id.\n3. POST /functions/v1/process-document-batch with that batchId.\n4. Background worker downloads and OCRs those queue items via service_role.",
+      "evidence": [
+        "supabase/functions/process-document-batch/index.ts:22-36",
+        "supabase/functions/process-document-batch/index.ts:39-47",
+        "supabase/functions/process-document-batch/index.ts:80-153"
+      ],
+      "remediation": "Fail-closed CRON_SECRET or staff plus membership on the batch workspace. Do not accept interactive JWTs for queue claim.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/ai-task-generator/index.ts",
+      "title": "ai-task-generator creates tasks on arbitrary account_id with service_role and requireAuth-only",
+      "description": "Any authenticated user supplies triggerData.account_id. Matching rules insert into tasks via service_role with that account_id and no is_agency_member or staff check.",
+      "impact": "Portal or foreign-tenant users can plant tasks on other agencies' accounts.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:21:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. POST /functions/v1/ai-task-generator with a valid triggerType and victim account_id.\n3. Service-role inserts tasks under that account.",
+      "evidence": [
+        "supabase/functions/ai-task-generator/index.ts:54-70",
+        "supabase/functions/ai-task-generator/index.ts:192-206"
+      ],
+      "remediation": "Require staff plus is_agency_member on triggerData.account_id before insert.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/comparison-report/index.ts",
+      "title": "comparison-report reads any comparison workspace and publishes HTML via getPublicUrl",
+      "description": "Same requireAuth+service_role+workspace_id class as comparison-extract, with unique extra impact: generated HTML is uploaded to workspace-documents and exposed with getPublicUrl.",
+      "impact": "Cross-tenant disclosure of comparison snapshots/results plus a durable public URL for the report HTML.",
+      "verified": true,
+      "status": "active",
+      "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+      "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+      "detected_at_pst": "2026-08-23T02:21:00-07:00",
+      "reported_link": "",
+      "attack_path": "1. Authenticate with any JWT.\n2. POST /functions/v1/comparison-report with victim workspace_id.\n3. Service-role loads comparison_results and policy_snapshots.\n4. HTML uploaded; record includes public html_url.",
+      "evidence": [
+        "supabase/functions/comparison-report/index.ts:42-68",
+        "supabase/functions/comparison-report/index.ts:73-104",
+        "supabase/functions/comparison-report/index.ts:115-133"
+      ],
+      "remediation": "Require workspace ownership/membership before read. Use signed URLs, not public URLs, for reports.",
+      "poc_video_notes": "PoC video not feasible: requires a live multi-tenant Supabase project and must not exploit production."
+    }
+  ],
+  "candidates_rejected": [
+    "Skip-list IDORs (ai-document-analysis-simple, explore-qa, worker-comparison, check-document-integrity, classify-document, comparison-extract, index-document-chunks)",
+    "comparison-analyze same class as comparison-extract without unique extra impact",
+    "Previously reported canopy-document-proxy/reprocess/webhook; monitoring/servicing are new functions",
+    "esign-webhook now fail-closed on missing/invalid signatures",
+    "admin-create-user/password/approvals use requireActiveProvisionedAdmin",
+    "decrypt-ssn and pdf-generation-worker absent",
+    "CRON workers fail-closed in production; shared cron-auth fail-open already known",
+    "Twilio/Parseur/email-inbound fail-closed",
+    "send-coi-email/generate-certificate/client-context-api/get-document-url/floor-action gated",
+    "send-sms/send-id-card-email/esign-create-request approval-gated; email-send portal abuse already known",
+    "Prior SSRF/IDOR findings (acord extractor, explore process, prism, ocr-document, lewi_analyze, extract-*-policy, document-qa-azure, etc.)",
+    "ai-brain-rag scopes to account_memberships",
+    "parse-document-ocr/ai-document-intelligence operate on caller-uploaded bytes only",
+    "submit-comparison deferred as facilitator of known worker-comparison",
+    "module-builder-chat/hermes-chat/azure-diagnostics below bar or already known"
+  ]
+}

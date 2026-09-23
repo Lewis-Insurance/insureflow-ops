@@ -1,0 +1,30 @@
+{
+  "scan": "injection-ssrf-storage-email-vuln-hunt-2026-08-23",
+  "commit_hash": "e4e7c6c6a61685066add54c5d4a79473d7392bbb",
+  "background_composer_id": "bc-25b7e70b-c835-4caa-ae14-5296b71a66a9",
+  "detected_at_pst": "2026-08-23T02:20:46-07:00",
+  "scope": "Non-RLS / non-edge-IDOR: secrets, injection, SSRF, email, storage defaults, auth trust, mass assignment, logic",
+  "findings": [
+    {
+      "severity": "critical",
+      "location": "supabase/migrations/20251028214559_04cdd6c2-dee6-41a5-80c8-85cecdb2b4ae.sql",
+      "title": "documents storage bucket is public and any authenticated user can overwrite or delete every object",
+      "verified": true,
+      "status": "active"
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20251029152842_ead694ca-4dd7-4b3b-b37b-632f76a2646a.sql",
+      "title": "workspace-documents bucket is public; comparison policy PDFs world-readable by URL",
+      "verified": true,
+      "status": "active"
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/send-id-card-email/index.ts",
+      "title": "send-id-card-email embeds attacker-controlled idCardUrl in agency-branded mail with no staff or URL allowlist",
+      "verified": true,
+      "status": "active"
+    }
+  ]
+}
