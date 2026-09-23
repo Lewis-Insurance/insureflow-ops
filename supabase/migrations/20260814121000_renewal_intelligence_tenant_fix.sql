@@ -1,13 +1,7 @@
--- Renewal Intelligence dashboard: server-side cohort counts so summary tiles and
--- risk distribution chips stay accurate beyond PostgREST max_rows (1000).
---
--- Keep the RPC invoker-scoped and explicitly workspace-scoped. SECURITY DEFINER
--- would bypass renewals/renewal_campaigns RLS, while is_staff() alone proves only
--- that the caller is staff -- it does not establish which workspaces they may read.
+-- Forward repair for environments that already have either the legacy out-of-band
+-- JSON RPC or 20260814120000's first SECURITY DEFINER implementation.
+-- Idempotent policy drops preserve the canonical active-membership policies.
 
--- Historical migrations left several permissive staff-wide policies in place.
--- Narrow active-membership policies already exist for these tables; remove only
--- the policies that OR around those tenant boundaries.
 DROP POLICY IF EXISTS "Staff can manage renewals" ON public.renewals;
 DROP POLICY IF EXISTS "Staff can view all renewals" ON public.renewals;
 DROP POLICY IF EXISTS "Staff can insert renewals" ON public.renewals;
