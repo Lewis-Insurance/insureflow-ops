@@ -229,12 +229,17 @@ export function useUnifiedIntakeSave() {
       if (!ctx.accountId) {
         throw new Error('The customer was not saved before the policy. Nothing was written for this step; retry.');
       }
-      const base = buildPolicyInsert(input.policy, ctx.accountId, ctx.userId);
-      const row: Record<string, unknown> = { ...base };
-      if (input.carrier) {
-        row.carrier_id = input.carrier.id;
-        row.carrier_naic = input.carrier.naic;
-      }
+      // carrier_id links the policy to the carrier directory; NAIC is left to
+      // resolve live from `carriers` at certificate time. Snapshotting the NAIC
+      // here used to freeze whatever the directory held on intake day, and a
+      // policy-level carrier_naic outranks carriers.naic forever, so a later
+      // correction on the Carriers page would never reach the certificate.
+      const row: Record<string, unknown> = buildPolicyInsert(
+        input.policy,
+        ctx.accountId,
+        ctx.userId,
+        input.carrier ?? null,
+      );
       const { data, error } = await supabase
         .from('policies')
         .insert([row as never])

@@ -307,6 +307,7 @@ function IssuanceLogPlaceholder({ accountId }: { accountId: string }) {
 export function MasterCOISection({ accountId }: MasterCOISectionProps) {
   const { data, isLoading, error, refetch } = useMasterCoi(accountId);
   const [openLineKey, setOpenLineKey] = useState<COILineKey | null>(null);
+  const [showWarnings, setShowWarnings] = useState(false);
 
   // Group blockers by line once so each row gets only its own, and the "Review
   // blockers" action can jump to the first blocked line.
@@ -352,11 +353,19 @@ export function MasterCOISection({ accountId }: MasterCOISectionProps) {
     setOpenLineKey(firstBlockedLineKey);
   };
 
+  // The count alone tells a staffer that something is off without telling them
+  // what, which is how a blank NAIC box reads as a bug rather than as missing
+  // data. The messages are one click away and name what to fix.
   const readinessSuffix = isReady ? (
     warningCount > 0 ? (
-      <span className="cc-num text-xs text-cc-text-muted">
+      <button
+        type="button"
+        onClick={() => setShowWarnings((v) => !v)}
+        aria-expanded={showWarnings}
+        className="cc-num text-xs text-cc-text-muted underline-offset-2 hover:text-cc-text-primary hover:underline"
+      >
         {warningCount} {warningCount === 1 ? 'warning' : 'warnings'}
-      </span>
+      </button>
     ) : null
   ) : (
     <button
@@ -381,6 +390,23 @@ export function MasterCOISection({ accountId }: MasterCOISectionProps) {
               </div>
             }
           />
+
+          {showWarnings && warningCount > 0 && (
+            <ul className="space-y-1 rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3">
+              {data.readiness.warnings.map((w, i) => (
+                <li
+                  key={`${w.code}-${i}`}
+                  className="flex items-start gap-2 text-xs text-cc-text-secondary"
+                >
+                  <CircleAlert
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cc-warning"
+                    aria-hidden="true"
+                  />
+                  <span>{w.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <NamedInsuredBlock named={data.named_insured} accountId={accountId} />
 

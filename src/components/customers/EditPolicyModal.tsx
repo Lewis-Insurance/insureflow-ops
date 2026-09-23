@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
+import { useLinesOfBusiness } from '@/hooks/useLookupData';
+import { CarrierCombobox, type CarrierResolution } from '@/components/add-policy/CarrierCombobox';
 import { calcExpirationDate, parsePolicyTerm } from '@/lib/policyDates';
 import { format, parse } from 'date-fns';
 import { z } from 'zod';
@@ -98,12 +99,18 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // The carrier directory row this policy is linked to. Loaded before the picker
+  // is allowed to auto-link, so a policy deliberately linked to a wholesaler is
+  // never silently relinked by a name match.
+  const [carrierResolution, setCarrierResolution] = useState<CarrierResolution | null>(null);
+  const [carrierLinkLoaded, setCarrierLinkLoaded] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const { toast } = useToast();
   
-  // Fetch carriers and lines of business
-  const { data: carriers = [], isLoading: carriersLoading } = useCarriers();
+  // Lines of business only. The carrier field reads the directory through
+  // CarrierCombobox so there is one carrier list, not two.
+
   const { data: linesOfBusiness = [], isLoading: lobLoading } = useLinesOfBusiness();
 
   useEffect(() => {
@@ -125,6 +132,44 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
       });
     }
   }, [policy]);
+
+  // Seed the carrier link from the policy itself. carrier_id is not part of the
+  // Policy prop every caller passes, so read it here rather than making half a
+  // dozen call sites select one more column.
+  useEffect(() => {
+    let cancelled = false;
+    setCarrierResolution(null);
+    setCarrierLinkLoaded(false);
+    if (!policy?.id) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('policies')
+        .select('carrier_id')
+        .eq('id', policy.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) return;
+      const carrierId = (data?.carrier_id as string | null) ?? null;
+      if (carrierId) {
+        const { data: carrierRow } = await supabase
+          .from('carriers')
+          .select('id, naic')
+          .eq('id', carrierId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (carrierRow) {
+          const naic = ((carrierRow.naic as string | null) ?? '').trim();
+          setCarrierResolution({ id: carrierRow.id as string, naic: naic === '' ? null : naic });
+        }
+      }
+      // Only after this flips does the picker link an exact name on its own,
+      // and only then does saving touch carrier_id.
+      setCarrierLinkLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [policy?.id]);
 
   const validateForm = () => {
     try {
@@ -172,6 +217,13 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
       const policyData = {
         policy_number: formData.policy_number.trim(),
         carrier: formData.carrier.trim(),
+        // Only touch the link once we know what it was, so a failed read can
+        // never clear a good carrier_id. carrier_naic is cleared because the
+        // directory owns NAIC; a stale value on the policy would outrank
+        // carriers.naic on every future certificate.
+        ...(carrierLinkLoaded
+          ? { carrier_id: carrierResolution?.id ?? null, carrier_naic: null }
+          : {}),
         line_of_business: formData.line_of_business.trim(),
         premium: formData.premium ? parseFloat(formData.premium) : null,
         effective_date: formatDateForStorage(formData.effective_date),
@@ -328,20 +380,20 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
             </div>
             <div>
               <Label htmlFor="carrier">Carrier *</Label>
-              <Select value={formData.carrier} onValueChange={(value) => handleInputChange('carrier', value)}>
-                <SelectTrigger className={errors.carrier ? 'border-destructive' : ''}>
-                  <SelectValue placeholder="Select carrier" />
-                </SelectTrigger>
-                <SelectContent>
-                  {carriersLoading ? (
-                    <SelectItem value="loading" disabled>Loading...</SelectItem>
-                  ) : (
-                    carriers.map(carrier => (
-                      <SelectItem key={carrier.id} value={carrier.name}>{carrier.name}</SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              {/* Same picker, same carriers rows, same directory the Carriers
+                  page owns. Choosing here relinks carrier_id so the certificate
+                  NAIC follows the directory. */}
+              <CarrierCombobox
+                id="carrier"
+                value={formData.carrier}
+                resolution={carrierResolution}
+                error={!!errors.carrier}
+                autoLink={carrierLinkLoaded}
+                onChange={(name, resolution) => {
+                  handleInputChange('carrier', name);
+                  setCarrierResolution(resolution);
+                }}
+              />
               {errors.carrier && (
                 <p className="text-sm text-destructive mt-1">{errors.carrier}</p>
               )}

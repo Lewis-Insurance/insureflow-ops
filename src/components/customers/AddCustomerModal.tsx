@@ -21,6 +21,8 @@ import {
   buildPolicyInsert,
   type PolicyFormData,
 } from './PolicyFormFields';
+import type { CarrierResolution } from '@/components/add-policy/CarrierCombobox';
+import { findCarrierByName, useCarrierDirectory } from '@/hooks/useCarrierDirectory';
 import { detectEntityFromName, parseCompoundInsuredName, type EntityType } from '@/lib/insuredNames';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
@@ -173,6 +175,10 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
     secondary_entity_name: '',
   });
   const [policyData, setPolicyData] = useState<PolicyFormData>(initialPolicyFormData);
+  // Carrier directory row for the optional policy. Links policies.carrier_id so
+  // the certificate NAIC resolves from `carriers` rather than free text.
+  const [carrierResolution, setCarrierResolution] = useState<CarrierResolution | null>(null);
+  const { data: carrierDirectory = [] } = useCarrierDirectory();
   const [policyNeedsConfirmation, setPolicyNeedsConfirmation] = useState<Record<string, boolean>>({});
   const [includePolicy, setIncludePolicy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -522,7 +528,12 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
       // Create policy if enabled and has required data
       if (includePolicy && policyData.policy_number && policyData.carrier) {
-        const policyInsertData = buildPolicyInsert(policyData, newCustomer.id, user?.id ?? null);
+        // Same backstop as AddPolicyModal: an exact directory name links
+        // carrier_id even if the picker had not resolved it yet.
+        const exactByName = findCarrierByName(carrierDirectory, policyData.carrier);
+        const linkedCarrier =
+          carrierResolution ?? (exactByName ? { id: exactByName.id, naic: exactByName.naic } : null);
+        const policyInsertData = buildPolicyInsert(policyData, newCustomer.id, user?.id ?? null, linkedCarrier);
 
         const { data: newPolicy, error: policyError } = await supabase
           .from('policies')
@@ -621,6 +632,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         secondary_entity_name: '',
       });
       setPolicyData(initialPolicyFormData);
+      setCarrierResolution(null);
       setPolicyNeedsConfirmation({});
       setPolicyErrors({});
       setIncludePolicy(false);
@@ -1019,6 +1031,8 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
                 <PolicyFormFields
                   value={policyData}
                   onChange={handlePolicyChange}
+                  carrierResolution={carrierResolution}
+                  onCarrierResolutionChange={setCarrierResolution}
                   errors={policyErrors}
                   needsConfirmation={policyNeedsConfirmation}
                   carriers={carriers}

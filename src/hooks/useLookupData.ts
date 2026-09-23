@@ -20,35 +20,17 @@ export function useCarriers() {
   });
 }
 
-export interface CarrierOption {
-  id: string;
-  name: string;
-  naic: string | null;
-}
-
 /**
- * Carriers with their NAIC codes, for the unified Add Policy page's carrier
- * combobox. Picking a saved carrier lets us populate policies.carrier_id and
- * policies.carrier_naic (only a subset of carriers have a NAIC on file).
+ * The carrier directory (id, name, NAIC) now lives in one place so there is a
+ * single carrier store and a single cache entry for it. Re-exported here for the
+ * call sites that already imported it from this module.
+ *
+ * @see src/hooks/useCarrierDirectory.ts
  */
-export function useCarriersWithNaic() {
-  return useQuery({
-    queryKey: ['carriers', 'with-naic'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('carriers')
-        .select('id, name, naic')
-        .order('name');
-
-      if (error) {
-        throw new Error(`Failed to fetch carriers: ${error.message}`);
-      }
-
-      return (data || []) as CarrierOption[];
-    },
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
-}
+export {
+  useCarrierDirectory as useCarriersWithNaic,
+  type CarrierDirectoryEntry as CarrierOption,
+} from './useCarrierDirectory';
 
 export function useMGAs() {
   return useQuery({

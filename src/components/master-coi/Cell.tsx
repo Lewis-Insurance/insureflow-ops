@@ -52,7 +52,12 @@ function formatValue(
 
 export function Cell({ label, cell, format = 'currency' }: CellProps) {
   const value = cell?.v;
-  const isMissing = value == null || cell?.src === 'missing';
+  // An empty or whitespace-only string is missing, not a value. carriers.naic
+  // used to be stored as '' for "no NAIC on file", which rendered here as a
+  // blank box under a provenance label, reading as resolved when nothing was.
+  // Honest by contract (constitution rule 4) means blank shows as Missing.
+  const isBlankString = typeof value === 'string' && value.trim() === '';
+  const isMissing = value == null || isBlankString || cell?.src === 'missing';
 
   return (
     <div className="space-y-0.5">

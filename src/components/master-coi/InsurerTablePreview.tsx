@@ -9,6 +9,7 @@
 // instead of silently dropping rows. The table scrolls inside its own
 // overflow-x-auto container so the page body never scrolls sideways.
 
+import { Link } from 'react-router-dom';
 import { Chip, SectionLabel } from '@/components/cc';
 import { Cell } from './Cell';
 import { lineLabel } from './lineDisplay';
@@ -17,6 +18,12 @@ import type { COIInsurer, COIInsurerOverflow } from '@/types/master-coi';
 export interface InsurerTablePreviewProps {
   insurers: COIInsurer[];
   overflow: COIInsurerOverflow[];
+}
+
+/** A NAIC that is absent, blank, or whitespace is no NAIC at all. */
+function hasNaic(insurer: COIInsurer): boolean {
+  const v = insurer.naic?.v;
+  return v !== null && v !== undefined && String(v).trim() !== '';
 }
 
 export function InsurerTablePreview({ insurers, overflow }: InsurerTablePreviewProps) {
@@ -69,6 +76,18 @@ export function InsurerTablePreview({ insurers, overflow }: InsurerTablePreviewP
                   </td>
                   <td className="px-3 py-2">
                     <Cell label="NAIC" cell={insurer.naic} format="text" />
+                    {/* A missing NAIC is a data gap with one fix: the carrier
+                        directory. Link by insurer NAME, not by the policy's
+                        carrier_id, because the carrier that owns the NAIC is not
+                        always the one the policy is linked to. */}
+                    {!hasNaic(insurer) && insurer.name?.v ? (
+                      <Link
+                        to={`/carriers?q=${encodeURIComponent(String(insurer.name.v))}`}
+                        className="mt-1 inline-block text-xs font-semibold text-cc-accent underline-offset-2 hover:underline"
+                      >
+                        Add NAIC on Carriers
+                      </Link>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
