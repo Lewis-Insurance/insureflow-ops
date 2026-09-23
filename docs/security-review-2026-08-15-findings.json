@@ -1,0 +1,187 @@
+[
+  {
+    "severity": "high",
+    "location": "supabase/migrations/20251228200000_predictive_analytics_suite.sql",
+    "title": "get_account_insurance_profile: SECURITY DEFINER with no auth guard leaks any account's policy data",
+    "description": "The function get_account_insurance_profile(UUID) is SECURITY DEFINER, has SET search_path = public, but contains zero authentication or authorization checks. It accepts an arbitrary account_id and returns the account's insurance profile: active policy lines, total premium, tenure, max liability limit, and boolean flags for each coverage type. It is granted EXECUTE to authenticated, meaning any signed-in user (including a customer-portal user from a different agency workspace) can call it with any account_id in the database.",
+    "impact": "Any authenticated user can enumerate account insurance profiles across all agency workspaces. Leaked data includes policy lines held (auto, home, commercial, cyber, workers comp), total premium, tenure, and max liability limit — commercially sensitive underwriting intelligence.",
+    "attack_path": [
+      "1. Attacker signs up for an account or obtains any valid JWT (even a customer-portal user).",
+      "2. Attacker calls SELECT * FROM get_account_insurance_profile('<target_account_uuid>') via PostgREST RPC.",
+      "3. Function bypasses RLS (SECURITY DEFINER), queries policies and quote_coverages for the target account, and returns full insurance profile JSONB.",
+      "4. Attacker iterates over account UUIDs (obtained from other unscoped queries or by brute-force if UUIDv4 guessing is infeasible, or from leaked IDs in API responses) to build a profile of the entire book."
+    ],
+    "evidence": [
+      "supabase/migrations/20251228200000_predictive_analytics_suite.sql:626-690 (function body, no auth check)",
+      "supabase/migrations/20251228200000_predictive_analytics_suite.sql:832 (GRANT EXECUTE ... TO authenticated)"
+    ],
+    "remediation": "Add `IF NOT public.is_staff() THEN RAISE EXCEPTION 'permission denied: staff only' USING ERRCODE = '42501'; END IF;` at the top of the function body. Additionally, resolve the account's agency_workspace_id and check `is_agency_member()` to enforce workspace isolation.",
+    "poc_video_notes": "Requires a live Supabase instance with valid JWT; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "high",
+    "location": "supabase/migrations/20251228200000_predictive_analytics_suite.sql",
+    "title": "get_upcoming_renewals: SECURITY DEFINER accepts arbitrary workspace ID with no membership check",
+    "description": "The function get_upcoming_renewals(UUID, INT, UUID) is SECURITY DEFINER with SET search_path = public and is granted EXECUTE to authenticated. It takes p_agency_workspace_id as a parameter and filters policies by that workspace, but never verifies the caller is a member of that workspace (no is_agency_member() check, no is_staff() check). Any authenticated user can pass any workspace UUID and retrieve upcoming renewal details including policy numbers, account names, carrier names, premiums, and effective/expiration dates.",
+    "impact": "Cross-tenant data leak: any authenticated user can view another agency's upcoming renewals, including customer names, policy numbers, carrier details, and premium amounts.",
+    "attack_path": [
+      "1. Attacker obtains any valid JWT (customer-portal or staff from a different workspace).",
+      "2. Attacker calls SELECT * FROM get_upcoming_renewals('<other_workspace_uuid>') via PostgREST RPC.",
+      "3. Function runs as SECURITY DEFINER, bypassing RLS, and returns full renewal details from the target workspace.",
+      "4. Workspace UUIDs can be enumerated from agency_workspaces table if its RLS is not properly configured, or from URL patterns/API responses."
+    ],
+    "evidence": [
+      "supabase/migrations/20251228200000_predictive_analytics_suite.sql:577-623 (function body, no membership check)",
+      "supabase/migrations/20251228200000_predictive_analytics_suite.sql:830 (GRANT EXECUTE ... TO authenticated)"
+    ],
+    "remediation": "Add at function entry: `IF NOT public.is_staff() THEN RAISE EXCEPTION 'staff only' USING ERRCODE = '42501'; END IF; IF NOT public.is_agency_member(p_agency_workspace_id) THEN RAISE EXCEPTION 'forbidden: workspace membership required' USING ERRCODE = '42501'; END IF;`",
+    "poc_video_notes": "Requires a live Supabase instance with valid JWT; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "high",
+    "location": "supabase/migrations/20251228200000_predictive_analytics_suite.sql",
+    "title": "list_coverage_gap_opportunities: SECURITY DEFINER accepts arbitrary workspace ID with no membership check",
+    "description": "The function list_coverage_gap_opportunities(UUID, TEXT, TEXT, UUID, INT, INT) is SECURITY DEFINER with SET search_path = public, granted EXECUTE to authenticated. It takes p_agency_workspace_id and returns coverage gap opportunities including account names, opportunity details, severity, confidence scores, rationale, recommended next steps, and estimated premiums — all without verifying the caller is a member of the target workspace.",
+    "impact": "Cross-tenant data leak: any authenticated user can view another agency's coverage gap analysis, revealing which customers are under-insured, cross-sell opportunities, and estimated premium values. This is highly sensitive competitive intelligence.",
+    "attack_path": [
+      "1. Attacker obtains any valid JWT.",
+      "2. Attacker calls SELECT * FROM list_coverage_gap_opportunities('<other_workspace_uuid>') via PostgREST RPC.",
+      "3. Function runs as SECURITY DEFINER, bypassing all RLS, and returns coverage gap details from the target workspace."
+    ],
+    "evidence": [
+      "supabase/migrations/20251228200000_predictive_analytics_suite.sql:772-827 (function body, no auth check)",
+      "supabase/migrations/20251228200000_predictive_analytics_suite.sql:835 (GRANT EXECUTE ... TO authenticated)"
+    ],
+    "remediation": "Add is_staff() and is_agency_member(p_agency_workspace_id) guards at function entry.",
+    "poc_video_notes": "Requires a live Supabase instance with valid JWT; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "high",
+    "location": "supabase/migrations/20260204120000_renewal_intelligence_sync.sql",
+    "title": "aggregate_renewal_risk_indicators: SECURITY DEFINER with no auth guard and no search_path writes to all renewals",
+    "description": "The function aggregate_renewal_risk_indicators() is SECURITY DEFINER WITHOUT SET search_path, granted EXECUTE to authenticated. It iterates over ALL open renewals across ALL workspaces, reads communications, claims, and invoices (bypassing RLS), and writes risk indicator data back to the renewals table. It has no is_staff() check and no workspace scoping. Any authenticated user can trigger a full-book renewal data aggregation.",
+    "impact": "Any authenticated user (including customer-portal users) can trigger a bulk write operation across all renewals in all workspaces. The missing search_path also creates a search-path hijack vector where a malicious schema could intercept function calls. While the data written is aggregated indicators rather than directly leaked, the function's execution touches every account's communications, claims, and invoices under SECURITY DEFINER.",
+    "attack_path": [
+      "1. Attacker obtains any valid JWT.",
+      "2. Attacker calls SELECT * FROM aggregate_renewal_risk_indicators() via PostgREST RPC.",
+      "3. Function runs as postgres/BYPASSRLS, reads all communications, claims, and invoices, and writes aggregated indicators to all open renewals.",
+      "4. Search-path hijack: attacker creates a schema with a malicious 'renewals' or 'communications' table/function that intercepts queries."
+    ],
+    "evidence": [
+      "supabase/migrations/20260204120000_renewal_intelligence_sync.sql:106-175 (function body, no auth check, no search_path)",
+      "supabase/migrations/20260204120000_renewal_intelligence_sync.sql:316 (GRANT EXECUTE ... TO authenticated)"
+    ],
+    "remediation": "Recreate the function with SET search_path = public and add is_staff() guard. Consider restricting EXECUTE to service_role only (this is a batch operation that should run as a scheduled job, not be user-callable).",
+    "poc_video_notes": "Requires a live Supabase instance with valid JWT; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "high",
+    "location": "supabase/migrations/20260204120000_renewal_intelligence_sync.sql",
+    "title": "calculate_renewal_risk_scores: SECURITY DEFINER with no auth guard and no search_path writes risk scores to all renewals",
+    "description": "The function calculate_renewal_risk_scores() is SECURITY DEFINER WITHOUT SET search_path, granted EXECUTE to authenticated. It iterates over ALL open renewals across ALL workspaces, reads their risk indicators, computes risk scores and levels, and writes them back. No is_staff() check, no workspace scoping. Any authenticated user can trigger a full-book risk score recalculation.",
+    "impact": "Same class as aggregate_renewal_risk_indicators: unauthorized bulk write across all workspaces, plus search-path hijack risk. Risk scores and levels are written to every open renewal without authorization.",
+    "attack_path": [
+      "1. Attacker obtains any valid JWT.",
+      "2. Attacker calls SELECT * FROM calculate_renewal_risk_scores() via PostgREST RPC.",
+      "3. Function runs as SECURITY DEFINER/BYPASSRLS, processes and writes to all open renewals."
+    ],
+    "evidence": [
+      "supabase/migrations/20260204120000_renewal_intelligence_sync.sql:181-271 (function body, no auth check, no search_path)",
+      "supabase/migrations/20260204120000_renewal_intelligence_sync.sql:317 (GRANT EXECUTE ... TO authenticated)"
+    ],
+    "remediation": "Recreate with SET search_path = public and is_staff() guard. Restrict EXECUTE to service_role only.",
+    "poc_video_notes": "Requires a live Supabase instance with valid JWT; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "high",
+    "location": "supabase/migrations/20260204120000_renewal_intelligence_sync.sql",
+    "title": "refresh_renewal_intelligence: SECURITY DEFINER master pipeline with no auth guard, no search_path, chains three unguarded functions",
+    "description": "The function refresh_renewal_intelligence(INT) is SECURITY DEFINER WITHOUT SET search_path, granted EXECUTE to authenticated. It is the master pipeline that calls sync_policies_to_renewals (hardened separately in 20260702090000), aggregate_renewal_risk_indicators (unguarded), and calculate_renewal_risk_scores (unguarded) in sequence. While sync_policies_to_renewals now has an is_staff() guard, the other two chained calls still lack guards. Any authenticated user can trigger the full renewal intelligence pipeline.",
+    "impact": "Unauthenticated pipeline execution: any signed-in user triggers a multi-step batch operation touching policies, communications, claims, invoices, and renewals across all workspaces. The sync step will fail for non-staff callers, but this inconsistency (partial guard) means the function is in a broken state — it will raise 'staff only' on the first step but the intent was clearly to be freely callable.",
+    "attack_path": [
+      "1. Attacker obtains any valid JWT.",
+      "2. Attacker calls SELECT * FROM refresh_renewal_intelligence() via PostgREST RPC.",
+      "3. First step (sync) raises 'staff only' for non-staff, but the function itself is still executable and the guard mismatch shows the hardening was incomplete."
+    ],
+    "evidence": [
+      "supabase/migrations/20260204120000_renewal_intelligence_sync.sql:277-310 (function body, no auth check, no search_path)",
+      "supabase/migrations/20260204120000_renewal_intelligence_sync.sql:318 (GRANT EXECUTE ... TO authenticated)"
+    ],
+    "remediation": "Recreate with SET search_path = public. Add is_staff() guard. Restrict all three sub-functions to service_role only, as they are batch operations for scheduled jobs.",
+    "poc_video_notes": "Requires a live Supabase instance with valid JWT; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "medium",
+    "location": "supabase/migrations/20260108100000_fix_day_sheet_totals.sql",
+    "title": "recalculate_day_sheet_totals: SECURITY DEFINER with no auth guard and no search_path, writes to all day sheets",
+    "description": "The function recalculate_day_sheet_totals(UUID) is SECURITY DEFINER without SET search_path, granted EXECUTE to authenticated. When called with NULL (the default), it iterates over ALL day sheets across ALL workspaces and recalculates their financial totals. No is_staff() check, no workspace membership check. Any authenticated user can trigger a recalculation of all day sheet financial totals.",
+    "impact": "Any authenticated user can trigger a bulk recalculation of financial day sheet totals across all workspaces. While this is primarily a write operation (recalculating existing totals), the return value leaks sheet_date, old_total, new_total, and payment_count for every day sheet — exposing daily payment volumes across all agencies. Missing search_path is a hijack vector.",
+    "attack_path": [
+      "1. Attacker obtains any valid JWT.",
+      "2. Attacker calls SELECT * FROM recalculate_day_sheet_totals(NULL) via PostgREST RPC.",
+      "3. Function runs as SECURITY DEFINER/BYPASSRLS, iterates all day sheets, and returns financial summaries for each."
+    ],
+    "evidence": [
+      "supabase/migrations/20260108100000_fix_day_sheet_totals.sql:82-130 (function body, no auth check, no search_path)",
+      "supabase/migrations/20260108100000_fix_day_sheet_totals.sql:135 (GRANT EXECUTE ... TO authenticated)"
+    ],
+    "remediation": "Recreate with SET search_path = public and add is_staff() guard. Add workspace scoping so the function only processes day sheets in the caller's workspace.",
+    "poc_video_notes": "Requires a live Supabase instance with valid JWT; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "medium",
+    "location": "supabase/migrations/20260204000001_harden_soft_delete_functions.sql",
+    "title": "perform_soft_delete: SECURITY DEFINER with no workspace scoping allows cross-tenant record deletion",
+    "description": "The function perform_soft_delete(TEXT, UUID, TEXT) is SECURITY DEFINER with SET search_path = public, granted EXECUTE to authenticated. It checks the caller's role from the profiles table (staff/admin/owner/producer/csr/accounting) but does NOT verify workspace membership. A staff user in workspace A can soft-delete a record belonging to workspace B by passing its UUID. The function uses dynamic SQL (format + EXECUTE) to SET deleted_at on any row in the allowlisted tables.",
+    "impact": "Cross-tenant data destruction: a staff user in one agency can soft-delete accounts, policies, quotes, tasks, documents, communications, or contacts belonging to a different agency workspace. While soft-delete is reversible (restore_soft_deleted exists), this is a data integrity violation across tenant boundaries.",
+    "attack_path": [
+      "1. Staff user in workspace A obtains the UUID of an account/policy/etc. belonging to workspace B (e.g., from search functions or by guessing UUIDs).",
+      "2. Staff user calls SELECT perform_soft_delete('accounts', '<target_uuid>', 'test') via PostgREST RPC.",
+      "3. Function checks caller's profiles.role (passes for any staff), then executes UPDATE accounts SET deleted_at = NOW() WHERE id = '<target_uuid>'.",
+      "4. Record in workspace B is soft-deleted. The deletion_audit_log records the action but the workspace boundary was not enforced."
+    ],
+    "evidence": [
+      "supabase/migrations/20260204000001_harden_soft_delete_functions.sql:11-58 (function body, role check but no workspace check)",
+      "supabase/migrations/20260204000001_harden_soft_delete_functions.sql:111 (GRANT EXECUTE ... TO authenticated)"
+    ],
+    "remediation": "After the role check, resolve the target record's agency_workspace_id (either from the record itself or from its parent account) and verify is_agency_member(workspace_id). For tables with agency_workspace_id (accounts, tasks, communications), check directly; for child tables (policies, quotes, documents), join through account_id.",
+    "poc_video_notes": "Requires a live Supabase instance with two workspaces and staff accounts; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "medium",
+    "location": "supabase/migrations/20251228600000_automation_platform_foundation.sql",
+    "title": "automation_platform_settings table has no RLS — global kill switch and rate limits readable/writable by any role",
+    "description": "The table automation_platform_settings was created in migration 20251228600000 but RLS was never enabled on it. No subsequent migration enables RLS on this table. It contains the automation platform global kill switch (enabled boolean), rate limiting config (max_events_per_minute, max_gateway_calls_per_minute), dispatcher settings, retry settings, and feature flags. Without RLS, any authenticated user (and potentially anon via default Supabase grants) can read and write to this table.",
+    "impact": "Any authenticated user can disable the entire automation platform by setting enabled=false, change rate limits to cause service degradation, or toggle feature flags. This is a platform-wide denial-of-service vector that affects all workspaces simultaneously.",
+    "attack_path": [
+      "1. Attacker obtains any valid JWT.",
+      "2. Attacker calls UPDATE automation_platform_settings SET enabled = false via PostgREST.",
+      "3. All automations across all workspaces stop processing.",
+      "4. Alternatively, set max_events_per_minute = 0 to silently drop all automation events."
+    ],
+    "evidence": [
+      "supabase/migrations/20251228600000_automation_platform_foundation.sql:855-885 (CREATE TABLE, no ENABLE ROW LEVEL SECURITY)",
+      "No subsequent migration enables RLS on automation_platform_settings (verified by full grep)"
+    ],
+    "remediation": "ALTER TABLE automation_platform_settings ENABLE ROW LEVEL SECURITY; Create a SELECT policy for service_role + admin staff only. Create an UPDATE policy restricted to admin/owner roles with workspace membership. Revoke INSERT/DELETE from authenticated (singleton table).",
+    "poc_video_notes": "Requires a live Supabase instance; not reproducible in a static code review environment."
+  },
+  {
+    "severity": "medium",
+    "location": "supabase/migrations/20260410000009_enhanced_admin_system.sql",
+    "title": "admin_budget_alerts table has no RLS — budget alert data accessible without authorization",
+    "description": "The table admin_budget_alerts was created in migration 20260410000009 but RLS was never enabled on it. Its parent table admin_budgets has RLS with an admin/owner policy, but admin_budget_alerts itself has no RLS. Budget alerts contain budget_id (FK to admin_budgets), alert_type (spend_spike, token_spike, error_spike, threshold_reached), current_value, and threshold_value.",
+    "impact": "Any authenticated user can read budget alert data including spending spikes, token usage spikes, and error rate alerts. While less sensitive than customer data, this leaks operational intelligence about AI/API spending patterns and system health. An attacker could also INSERT fake alerts or DELETE real ones.",
+    "attack_path": [
+      "1. Attacker obtains any valid JWT.",
+      "2. Attacker calls SELECT * FROM admin_budget_alerts via PostgREST.",
+      "3. All budget alert records are returned (no RLS filtering)."
+    ],
+    "evidence": [
+      "supabase/migrations/20260410000009_enhanced_admin_system.sql:267-275 (CREATE TABLE, no ENABLE ROW LEVEL SECURITY)",
+      "supabase/migrations/20260410000009_enhanced_admin_system.sql:393 (admin_budgets has RLS, but admin_budget_alerts does not)"
+    ],
+    "remediation": "ALTER TABLE admin_budget_alerts ENABLE ROW LEVEL SECURITY; Create a SELECT/ALL policy matching the parent admin_budgets policy (admin/owner from profiles.role).",
+    "poc_video_notes": "Requires a live Supabase instance; not reproducible in a static code review environment."
+  }
+]
